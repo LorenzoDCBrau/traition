@@ -43,18 +43,17 @@ export class SceneManager {
     this.renderer.setSize(w, h, false)
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
 
     this._setupLights()
     window.addEventListener('resize', this._onResize)
   }
 
   private _setupLights() {
-    // Warm ambient fill
-    this.scene.add(new THREE.AmbientLight(0xfff5e0, 0.6))
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.5))
 
-    // Main directional sun — top-right, soft shadows
-    const sun = new THREE.DirectionalLight(0xfffde7, 2.8)
-    sun.position.set(20, 35, 15)
+    const sun = new THREE.DirectionalLight(0xffffff, 2.0)
+    sun.position.set(10, 20, 10)
     sun.castShadow = true
     sun.shadow.mapSize.set(4096, 4096)
     sun.shadow.camera.near = 1
@@ -66,11 +65,6 @@ export class SceneManager {
     sun.shadow.bias = -0.0005
     sun.shadow.normalBias = 0.02
     this.scene.add(sun)
-
-    // Cool fill from opposite side
-    const fill = new THREE.DirectionalLight(0x99bbff, 0.5)
-    fill.position.set(-10, 10, -10)
-    this.scene.add(fill)
   }
 
   /** Place room-atmosphere point lights at world positions */

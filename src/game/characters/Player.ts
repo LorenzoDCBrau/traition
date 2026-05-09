@@ -25,8 +25,8 @@ export class Player {
     const b2 = new THREE.Box3().setFromObject(model)
     const startY = FLOOR_LEVEL - b2.min.y
 
-    // Start at center of main room (tile 4.5,4.5 = world 9,9)
-    this.position = new THREE.Vector3(9, startY, 9)
+    // Start at center of main room (tile 5.5,5.5 in a 12×12 grid = world 11,11)
+    this.position = new THREE.Vector3(11, startY, 11)
     model.position.copy(this.position)
 
     model.traverse((n) => {
@@ -47,15 +47,24 @@ export class Player {
 
   static async load(scene: THREE.Scene): Promise<Player> {
     const url = '/assets/characters/character-a.glb'
+    const texUrl = '/assets/characters/texture-a.png'
     try {
       const gltf = await new Promise<{ scene: THREE.Group }>((res, rej) =>
         new GLTFLoader().load(url, res as never, undefined, rej),
       )
+      const tex = new THREE.TextureLoader().load(texUrl)
+      tex.colorSpace = THREE.SRGBColorSpace
+      gltf.scene.traverse((n) => {
+        if (n instanceof THREE.Mesh) {
+          const mat = n.material as THREE.MeshStandardMaterial
+          mat.map = tex
+          mat.needsUpdate = true
+        }
+      })
       console.log(`[Player] ✓ ${url}`)
       return new Player(scene, gltf.scene)
     } catch (err) {
       console.warn(`[Player] Failed to load ${url}, using fallback cube:`, err)
-      // White cube placeholder: 0.6 wide × 1.5 tall
       const group = new THREE.Group()
       const body = new THREE.Mesh(
         new THREE.BoxGeometry(0.6, 1.5, 0.6),

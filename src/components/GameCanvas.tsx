@@ -3,6 +3,7 @@ import { SceneManager } from '../game/engine/SceneManager'
 import { GameLoop } from '../game/engine/GameLoop'
 import { buildSpaceStationRoom } from '../game/world/RoomBuilder'
 import { Player } from '../game/characters/Player'
+import { spawnNPCs } from '../game/characters/NPCManager'
 import { WeaponView } from '../game/weapons/WeaponView'
 
 export default function GameCanvas() {
@@ -21,18 +22,23 @@ export default function GameCanvas() {
       const loaded = await buildSpaceStationRoom(sceneManager.scene)
       console.log('[GameCanvas] Room GLBs loaded:', loaded)
 
-      // Room atmosphere lights at world positions matching the room layout
-      // Main room center (tile 4.5,4.5 → world 9,9)
-      sceneManager.addRoomLight(9,  3, 9,  0xffcc66, 5, 20)
-      // North room (tile 4.5,-4.5 → world 9,-9)
-      sceneManager.addRoomLight(9,  3, -9, 0x66aaff, 4, 14)
-      // East room (tile 13,4.5 → world 26,9)
-      sceneManager.addRoomLight(26, 3, 9,  0xff8844, 4, 14)
-      // West room (tile -4,4.5 → world -8,9)
-      sceneManager.addRoomLight(-8, 3, 9,  0xaa66ff, 4, 14)
+      // Room atmosphere lights
+      // Main room center: tile (5.5,5.5) in 12×12 → world (11,0,11)
+      sceneManager.addRoomLight(11, 3, 11,  0xffcc66, 5, 24)
+      // North room center: tile (5.5,-4.5) → world (11,0,-9)
+      sceneManager.addRoomLight(11, 3, -9,  0x66aaff, 4, 14)
+      // East room center: tile (15,5.5) → world (30,0,11)
+      sceneManager.addRoomLight(30, 3, 11,  0xff8844, 4, 14)
+      // West room center: tile (-4,5.5) → world (-8,0,11)
+      sceneManager.addRoomLight(-8, 3, 11,  0xaa66ff, 4, 14)
+      // Station module center: tile (5.5,15.5) → world (11,0,31)
+      sceneManager.addRoomLight(11, 3, 31,  0x44ffcc, 3, 12)
 
       setLoadStatus('Loading character...')
       const player = await Player.load(sceneManager.scene)
+
+      setLoadStatus('Spawning NPCs...')
+      await spawnNPCs(sceneManager.scene)
 
       setLoadStatus('Loading weapon...')
       const weaponView = await WeaponView.load()
