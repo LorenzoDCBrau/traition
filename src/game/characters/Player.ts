@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { FLOOR_LEVEL } from '../world/RoomBuilder'
 
-const TARGET_HEIGHT = 1.5 // world units
+const TARGET_HEIGHT = 2.0 // world units
 const SPEED = 5
 
 export class Player {
@@ -46,15 +46,28 @@ export class Player {
   }
 
   static async load(scene: THREE.Scene): Promise<Player> {
-    const url = '/assets/characters/character-a.glb'
+    const glbUrl = '/assets/characters/character-a.glb'
+    const texUrl = '/assets/characters/texture-a.png'
     try {
-      const gltf = await new Promise<{ scene: THREE.Group }>((res, rej) =>
-        new GLTFLoader().load(url, res as never, undefined, rej),
-      )
-      console.log(`[Player] ✓ ${url}`)
-      return new Player(scene, gltf.scene)
+      const [gltf, texture] = await Promise.all([
+        new Promise<{ scene: THREE.Group }>((res, rej) =>
+          new GLTFLoader().load(glbUrl, res as never, undefined, rej),
+        ),
+        new Promise<THREE.Texture>((res, rej) =>
+          new THREE.TextureLoader().load(texUrl, res, undefined, rej),
+        ),
+      ])
+      texture.colorSpace = THREE.SRGBColorSpace
+      const model = gltf.scene
+      model.traverse((n) => {
+        if (n instanceof THREE.Mesh) {
+          n.material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, metalness: 0.0 })
+        }
+      })
+      console.log(`[Player] ✓ ${glbUrl}`)
+      return new Player(scene, model)
     } catch (err) {
-      console.warn(`[Player] Failed to load ${url}, using fallback cube:`, err)
+      console.warn(`[Player] Failed to load ${glbUrl}, using fallback cube:`, err)
       const group = new THREE.Group()
       const body = new THREE.Mesh(
         new THREE.BoxGeometry(0.6, 1.5, 0.6),

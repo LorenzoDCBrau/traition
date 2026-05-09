@@ -3,8 +3,9 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { FLOOR_LEVEL } from '../world/RoomBuilder'
 
 const loader = new GLTFLoader()
+const texLoader = new THREE.TextureLoader()
 
-const TARGET_HEIGHT = 1.5
+const TARGET_HEIGHT = 2.0
 
 // Characters b–r = 17 NPCs (character-a is the player)
 const NPC_IDS = ['b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r']
@@ -46,18 +47,25 @@ export async function spawnNPCs(scene: THREE.Scene): Promise<void> {
     const [wx, wz, rotY] = NPC_PLACEMENTS[i] ?? [i * 2 - 11, 0, 0]
 
     try {
-      const gltf = await new Promise<{ scene: THREE.Group }>((res, rej) =>
-        loader.load(
-          `/assets/characters/character-${id}.glb`,
-          res as never,
-          undefined,
-          (e) => rej(e),
+      const [gltf, texture] = await Promise.all([
+        new Promise<{ scene: THREE.Group }>((res, rej) =>
+          loader.load(
+            `/assets/characters/character-${id}.glb`,
+            res as never,
+            undefined,
+            (e) => rej(e),
+          ),
         ),
-      )
+        new Promise<THREE.Texture>((res, rej) =>
+          texLoader.load(`/assets/characters/texture-${id}.png`, res, undefined, rej),
+        ),
+      ])
+      texture.colorSpace = THREE.SRGBColorSpace
       const model = gltf.scene
 
       model.traverse((n) => {
         if (n instanceof THREE.Mesh) {
+          n.material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, metalness: 0.0 })
           n.castShadow = true
           n.receiveShadow = true
         }

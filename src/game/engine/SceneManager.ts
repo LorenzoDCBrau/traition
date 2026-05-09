@@ -50,9 +50,9 @@ export class SceneManager {
   }
 
   private _setupLights() {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 1.5))
+    this.scene.add(new THREE.AmbientLight(0xffffff, 3.0))
 
-    const sun = new THREE.DirectionalLight(0xffffff, 2.0)
+    const sun = new THREE.DirectionalLight(0xffffff, 4.0)
     sun.position.set(10, 20, 10)
     sun.castShadow = true
     sun.shadow.mapSize.set(4096, 4096)
@@ -65,6 +65,8 @@ export class SceneManager {
     sun.shadow.bias = -0.0005
     sun.shadow.normalBias = 0.02
     this.scene.add(sun)
+
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.0))
   }
 
   /** Place room-atmosphere point lights at world positions */

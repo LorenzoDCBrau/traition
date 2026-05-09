@@ -91,22 +91,11 @@ function placeClone(
   return c
 }
 
-/** Apply a texture to all MeshStandardMaterial meshes in a group. */
+/** Replace every mesh material with a new MeshStandardMaterial using the given texture. */
 function applyTexture(model: THREE.Group, tex: THREE.Texture) {
   model.traverse((n) => {
     if (n instanceof THREE.Mesh) {
-      const mat = n.material
-      if (Array.isArray(mat)) {
-        for (const m of mat) {
-          if (m instanceof THREE.MeshStandardMaterial) {
-            m.map = tex
-            m.needsUpdate = true
-          }
-        }
-      } else if (mat instanceof THREE.MeshStandardMaterial) {
-        mat.map = tex
-        mat.needsUpdate = true
-      }
+      n.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0.0 })
     }
   })
 }
@@ -318,7 +307,7 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
   placeDeco(rawStructure, 6, 5, Math.PI)
 
   // ── Furniture ────────────────────────────────────────────────────────────
-  const FURN = 1.7
+  const FURN = 2.5
 
   const putFurn = (raw: THREE.Group | null, tx: number, tz: number, rotY = 0) => {
     if (!raw) return
