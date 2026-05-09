@@ -1,10 +1,11 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
-import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js'
 
 // All spacekit pieces share the same grid size
 const TILE = 2 // world units per grid cell
+
+// Centers the 12×12 main room at world origin: tile 0→-11, tile 11→11, outer edges ±12
+const WORLD_OFFSET = -11
 
 const gltfLoader = new GLTFLoader()
 const texLoader = new THREE.TextureLoader()
@@ -18,29 +19,6 @@ async function tryLoadGLB(url: string): Promise<THREE.Group | null> {
     )
   } catch {
     console.warn(`[RoomBuilder] ✗ GLB: ${url}`)
-    return null
-  }
-}
-
-async function tryLoadOBJ(name: string): Promise<THREE.Group | null> {
-  try {
-    const mtlLoader = new MTLLoader()
-    mtlLoader.setPath('/assets/maps/station/')
-    mtlLoader.setResourcePath('/assets/maps/station/Textures/')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const materials: any = await new Promise((res, rej) =>
-      mtlLoader.load(`${name}.mtl`, (mc) => res(mc), undefined, (e) => rej(e)),
-    )
-    materials.preload()
-
-    const objLoader = new OBJLoader()
-    objLoader.setMaterials(materials)
-    objLoader.setPath('/assets/maps/station/')
-    return await new Promise<THREE.Group>((res, rej) =>
-      objLoader.load(`${name}.obj`, res, undefined, (e) => rej(e)),
-    )
-  } catch {
-    console.warn(`[RoomBuilder] ✗ OBJ: ${name}`)
     return null
   }
 }
@@ -190,7 +168,6 @@ function buildTileMap(walkable: Set<string>) {
       else if (!S && !E) map.set(key, { type: 'corner', rotY: 0 })
       else               map.set(key, { type: 'floor' })
     } else {
-      // Opposite blocked sides (corridor or peninsula) → floor
       map.set(key, { type: 'floor' })
     }
   }
@@ -201,7 +178,7 @@ function buildTileMap(walkable: Set<string>) {
 
 export const LOADED_GLBS: string[] = []
 
-/** Floor level in world-Y after room is built. Used for placing characters. */
+/** Floor level in world-Y. Flat plane at y=0. */
 export let FLOOR_LEVEL = 0
 
 export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[]> {
@@ -213,17 +190,16 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
     return m
   }
 
-  // ── Furniture atlas texture (variation-a.png) ────────────────────────────
+  // ── Furniture atlas texture ──────────────────────────────────────────────
   const varTex = texLoader.load('/assets/furniture/variation-a.png')
   varTex.colorSpace = THREE.SRGBColorSpace
 
   // ── Load spacekit structure assets ───────────────────────────────────────
-  const [rawFloor, rawWall, rawCorner, rawCorridor, rawCorridorCorner] = await Promise.all([
+  // rawFloor used only for unified scale computation (not tiled — has holes)
+  const [rawFloor, rawWall, rawCorner] = await Promise.all([
     track('/assets/maps/spacekit/corridor_open.glb'),
     track('/assets/maps/spacekit/corridor_wall.glb'),
     track('/assets/maps/spacekit/corridor_wallCorner.glb'),
-    track('/assets/maps/spacekit/corridor.glb'),
-    track('/assets/maps/spacekit/corridor_corner.glb'),
   ])
 
   // ── Load spacekit decoration assets ─────────────────────────────────────
@@ -237,7 +213,7 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
       track('/assets/maps/spacekit/structure.glb'),
     ])
 
-  // ── Load furniture (with variation-a.png texture) ────────────────────────
+  // ── Load furniture ───────────────────────────────────────────────────────
   const [arcadeM, pinballM, vendingM, clawM, danceM, gamblingM] = await Promise.all([
     track('/assets/furniture/arcade-machine.glb'),
     track('/assets/furniture/pinball.glb'),
@@ -247,20 +223,11 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
     track('/assets/furniture/gambling-machine.glb'),
   ])
 
-  // Apply variation-a.png to all furniture pieces
   for (const m of [arcadeM, pinballM, vendingM, clawM, danceM, gamblingM]) {
     if (m) applyTexture(m, varTex)
   }
 
-  // ── Load station kit OBJ pieces ──────────────────────────────────────────
-  const [stationFloor, stationWall, stationCorner, stationDoor] = await Promise.all([
-    tryLoadOBJ('floor'),
-    tryLoadOBJ('wall'),
-    tryLoadOBJ('wall-corner'),
-    tryLoadOBJ('door-single'),
-  ])
-
-  // ── Prepare spacekit templates with unified scale ────────────────────────
+  // ── Compute unified scale from floor tile (same family as walls/corners) ─
   const floorTpl  = rawFloor  ?? makeFallback(TILE * 0.98, 0.15, TILE * 0.98, 0x334455)
   const wallTpl   = rawWall   ?? makeFallback(TILE * 0.98, 2.2,  0.15,        0x445566)
   const cornerTpl = rawCorner ?? makeFallback(0.15, 2.2, 0.15, 0x556677)
@@ -274,133 +241,95 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
 
   applyUnifiedScale([floorTpl, wallTpl, cornerTpl], tileScale)
 
-  const floorY  = bottomY(floorTpl)
   const wallY   = bottomY(wallTpl)
   const cornerY = bottomY(cornerTpl)
 
-  const floorBox = box3(floorTpl)
-  FLOOR_LEVEL = floorBox.max.y
+  FLOOR_LEVEL = 0 // flat PlaneGeometry floor sits at y=0
 
   console.log(
     `[RoomBuilder] scale=${tileScale.toFixed(3)},` +
-    ` floorY=${floorY.toFixed(3)}, floorTop=${FLOOR_LEVEL.toFixed(3)}`,
+    ` wallY=${wallY.toFixed(3)}, FLOOR_LEVEL=${FLOOR_LEVEL}`,
   )
 
-  // ── Define walkable tile map ─────────────────────────────────────────────
-  //   +X = east, +Z = south. World pos of tile (tx,tz) = (tx*2, 0, tz*2).
-  //
-  //   Main room    : tx=0..11,  tz=0..11   (12×12)
-  //   North room   : tx=3..8,   tz=-6..-3  (6×4)
-  //   N corridor   : tx=5..6,   tz=-2..-1  (2×2)
-  //   East room    : tx=13..17, tz=3..8    (5×6)
-  //   E corridor   : tx=12,     tz=5..6    (1×2)
-  //   West room    : tx=-6..-2, tz=3..8    (5×6)
-  //   W corridor   : tx=-1,     tz=5..6    (1×2)
-  //   S corridor   : tx=5..6,   tz=12..13  (2×2) → leads to station OBJ area
+  // ── Solid floor plane — replaces corridor_open.glb tiles ─────────────────
+  const floorMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(24, 24),
+    new THREE.MeshStandardMaterial({ color: 0x1a1f2e, roughness: 0.8, metalness: 0.1 }),
+  )
+  floorMesh.rotation.x = -Math.PI / 2
+  floorMesh.receiveShadow = true
+  scene.add(floorMesh)
 
+  const grid = new THREE.GridHelper(24, 12, 0x2a3050, 0x2a3050)
+  grid.position.y = 0.01 // avoid z-fighting
+  scene.add(grid)
+
+  // ── Main room only: 12×12 (tiles 0..11, 0..11) ───────────────────────────
+  //   Centered at origin via WORLD_OFFSET = -11:
+  //   tile 0 → world -11, tile 11 → world 11, outer wall edges ±12
   const walkable = new Set<string>()
-  fillRect(walkable,  0,  0, 11, 11) // main room 12×12
-  fillRect(walkable,  3, -6,  8, -3) // north room 6×4
-  fillRect(walkable,  5, -2,  6, -1) // north corridor
-  fillRect(walkable, 13,  3, 17,  8) // east room 5×6
-  fillRect(walkable, 12,  5, 12,  6) // east corridor
-  fillRect(walkable, -6,  3, -2,  8) // west room 5×6
-  fillRect(walkable, -1,  5, -1,  6) // west corridor
-  fillRect(walkable,  5, 12,  6, 13) // south corridor → station module
+  fillRect(walkable, 0, 0, 11, 11)
 
-  // ── Place spacekit tiles ─────────────────────────────────────────────────
   const tileMap = buildTileMap(walkable)
 
   for (const [key, entry] of tileMap) {
     const [txs, tzs] = key.split(',')
-    const wx = +txs * TILE
-    const wz = +tzs * TILE
-    if (entry.type === 'floor')  placeClone(floorTpl,  scene, wx, floorY,  wz)
+    const wx = +txs * TILE + WORLD_OFFSET
+    const wz = +tzs * TILE + WORLD_OFFSET
     if (entry.type === 'wall')   placeClone(wallTpl,   scene, wx, wallY,   wz, entry.rotY)
     if (entry.type === 'corner') placeClone(cornerTpl, scene, wx, cornerY, wz, entry.rotY)
   }
 
-  // ── Place corridor arch pieces at connecting entrances ───────────────────
-  if (rawCorridor) {
-    fitToGrid(rawCorridor, TILE * 2)
-    const corrY = bottomY(rawCorridor)
-    placeClone(rawCorridor, scene, 5 * TILE, corrY,  0 * TILE, 0)      // N entrance inner
-    placeClone(rawCorridor, scene, 5 * TILE, corrY, 12 * TILE, 0)      // S entrance inner
-  }
-  if (rawCorridorCorner) {
-    fitToGrid(rawCorridorCorner, TILE * 2)
-    const ccY = bottomY(rawCorridorCorner)
-    placeClone(rawCorridorCorner, scene, 12 * TILE, ccY, 5 * TILE, -Math.PI / 2) // E entrance
-    placeClone(rawCorridorCorner, scene, -1 * TILE, ccY, 5 * TILE,  Math.PI / 2) // W entrance
-  }
-
-  // ── Spacekit decorations (main room interior) ────────────────────────────
+  // ── Decorations (tile coords 0..11 → world via WORLD_OFFSET) ────────────
   const DECO = 1.6
 
   const placeDeco = (raw: THREE.Group | null, tx: number, tz: number, rotY = 0) => {
     if (!raw) return
     const clone = raw.clone(true)
     const y = fitToGrid(clone, DECO)
-    clone.position.set(tx * TILE, y, tz * TILE)
+    clone.position.set(tx * TILE + WORLD_OFFSET, y, tz * TILE + WORLD_OFFSET)
     clone.rotation.y = rotY
     enableShadows(clone)
     scene.add(clone)
   }
 
   // Generators — corners of the main room interior
-  placeDeco(rawGenerator,   2,  2)
-  placeDeco(rawGenerator,   9,  2)
-  placeDeco(rawGenerator,   2,  9)
-  placeDeco(rawGenerator,   9,  9)
+  placeDeco(rawGenerator, 2, 2)
+  placeDeco(rawGenerator, 9, 2)
+  placeDeco(rawGenerator, 2, 9)
+  placeDeco(rawGenerator, 9, 9)
 
   // Barrels — scattered along walls
-  placeDeco(rawBarrel,      1,  4)
-  placeDeco(rawBarrel,     10,  4)
-  placeDeco(rawBarrel,      1,  7)
-  placeDeco(rawBarrel,     10,  7)
+  placeDeco(rawBarrel, 1, 4)
+  placeDeco(rawBarrel, 10, 4)
+  placeDeco(rawBarrel, 1, 7)
+  placeDeco(rawBarrel, 10, 7)
 
-  // Computer desks — north section of main room
-  placeDeco(rawDesk,        4,  2,  Math.PI)
-  placeDeco(rawDesk,        7,  2,  Math.PI)
-  placeDeco(rawDeskScreen,  5,  2,  Math.PI)
-  placeDeco(rawDeskScreen,  6,  2,  Math.PI)
+  // Computer desks — north section
+  placeDeco(rawDesk,       4, 2, Math.PI)
+  placeDeco(rawDesk,       7, 2, Math.PI)
+  placeDeco(rawDeskScreen, 5, 2, Math.PI)
+  placeDeco(rawDeskScreen, 6, 2, Math.PI)
 
-  // Stairs and structures — east/west of main room
-  placeDeco(rawStairs,      1,  6, -Math.PI / 2)
-  placeDeco(rawStairs,     10,  6,  Math.PI / 2)
-  placeDeco(rawStructure,   5,  5)
-  placeDeco(rawStructure,   6,  5,  Math.PI)
+  // Stairs and structures
+  placeDeco(rawStairs,    1, 6, -Math.PI / 2)
+  placeDeco(rawStairs,   10, 6,  Math.PI / 2)
+  placeDeco(rawStructure, 5, 5)
+  placeDeco(rawStructure, 6, 5, Math.PI)
 
-  // North room decorations
-  placeDeco(rawDesk,        4, -5,  Math.PI)
-  placeDeco(rawDesk,        7, -5,  Math.PI)
-  placeDeco(rawGenerator,   5, -4)
-  placeDeco(rawBarrel,      6, -3, -Math.PI / 2)
-
-  // East room decorations
-  placeDeco(rawGenerator,  14,  4)
-  placeDeco(rawBarrel,     16,  7)
-  placeDeco(rawStairs,     15,  5,  Math.PI / 2)
-
-  // West room decorations
-  placeDeco(rawGenerator,  -5,  4)
-  placeDeco(rawBarrel,     -3,  7)
-  placeDeco(rawStairs,     -4,  5, -Math.PI / 2)
-
-  // ── Furniture (textured with variation-a.png) ─────────────────────────────
+  // ── Furniture ────────────────────────────────────────────────────────────
   const FURN = 1.7
 
   const putFurn = (raw: THREE.Group | null, tx: number, tz: number, rotY = 0) => {
     if (!raw) return
     const clone = raw.clone(true)
     const y = fitToGrid(clone, FURN)
-    clone.position.set(tx * TILE, y, tz * TILE)
+    clone.position.set(tx * TILE + WORLD_OFFSET, y, tz * TILE + WORLD_OFFSET)
     clone.rotation.y = rotY
     enableShadows(clone)
     scene.add(clone)
   }
 
-  // Main room furniture — along walls
   putFurn(arcadeM,    1,  1,  Math.PI)
   putFurn(arcadeM,   10,  1,  Math.PI)
   putFurn(pinballM,   1, 10,  0)
@@ -413,68 +342,6 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
   putFurn(danceM,     8,  1,  Math.PI)
   putFurn(gamblingM,  1,  3, -Math.PI / 2)
   putFurn(gamblingM, 10,  3,  Math.PI / 2)
-
-  // North room furniture
-  putFurn(arcadeM,    4, -4,  Math.PI / 2)
-  putFurn(pinballM,   7, -4, -Math.PI / 2)
-  putFurn(vendingM,   5, -6,  0)
-  putFurn(gamblingM,  6, -6,  0)
-
-  // East room furniture
-  putFurn(arcadeM,   14,  3, -Math.PI / 2)
-  putFurn(clawM,     16,  6,  Math.PI)
-  putFurn(danceM,    15,  8,  Math.PI)
-  putFurn(vendingM,  13,  5,  Math.PI / 2)
-
-  // West room furniture
-  putFurn(arcadeM,   -5,  3,  Math.PI / 2)
-  putFurn(pinballM,  -3,  7,  Math.PI)
-  putFurn(danceM,    -4,  8,  Math.PI)
-  putFurn(vendingM,  -6,  5, -Math.PI / 2)
-
-  // ── Station OBJ module (south, tiles 4..7 × 14..17) ──────────────────────
-  //   4×4 floor area south of the south corridor, with walls on 3 sides
-  //   and a door at the north entrance.
-
-  if (stationFloor) {
-    fitToGrid(stationFloor, TILE)
-    const sfY = bottomY(stationFloor)
-    for (let tz = 14; tz <= 17; tz++) {
-      for (let tx = 4; tx <= 7; tx++) {
-        placeClone(stationFloor, scene, tx * TILE, sfY, tz * TILE)
-      }
-    }
-  }
-
-  if (stationWall) {
-    fitToGrid(stationWall, TILE)
-    const swY = bottomY(stationWall)
-    // South wall
-    for (let tx = 4; tx <= 7; tx++)
-      placeClone(stationWall, scene, tx * TILE, swY, 18 * TILE, 0)
-    // West wall
-    for (let tz = 14; tz <= 17; tz++)
-      placeClone(stationWall, scene, 3 * TILE, swY, tz * TILE, Math.PI / 2)
-    // East wall
-    for (let tz = 14; tz <= 17; tz++)
-      placeClone(stationWall, scene, 8 * TILE, swY, tz * TILE, -Math.PI / 2)
-  }
-
-  if (stationCorner) {
-    fitToGrid(stationCorner, TILE)
-    const scY = bottomY(stationCorner)
-    placeClone(stationCorner, scene, 3 * TILE, scY, 18 * TILE,  Math.PI / 2)  // SW
-    placeClone(stationCorner, scene, 8 * TILE, scY, 18 * TILE,  Math.PI)      // SE
-    placeClone(stationCorner, scene, 3 * TILE, scY, 14 * TILE,  0)            // NW
-    placeClone(stationCorner, scene, 8 * TILE, scY, 14 * TILE, -Math.PI / 2)  // NE
-  }
-
-  if (stationDoor) {
-    fitToGrid(stationDoor, TILE)
-    const sdY = bottomY(stationDoor)
-    // Door at north side center, between south corridor and station room
-    placeClone(stationDoor, scene, 5 * TILE, sdY, 14 * TILE, Math.PI)
-  }
 
   console.log(`[RoomBuilder] ${LOADED_GLBS.length} GLBs loaded:`)
   LOADED_GLBS.forEach((u) => console.log(`  ✓ ${u}`))

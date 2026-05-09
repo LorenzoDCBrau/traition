@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
 import { SceneManager } from '../game/engine/SceneManager'
 import { GameLoop } from '../game/engine/GameLoop'
 import { buildSpaceStationRoom } from '../game/world/RoomBuilder'
 import { Player } from '../game/characters/Player'
-import { spawnNPCs } from '../game/characters/NPCManager'
+import { spawnNPCs, DEBUG_NPCS_LOADED } from '../game/characters/NPCManager'
 import { WeaponView } from '../game/weapons/WeaponView'
+
+type DebugInfo = {
+  npcsLoaded: number
+  webglVersion: string
+  srgb: boolean
+}
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [loadStatus, setLoadStatus] = useState<string>('Initializing...')
   const [ready, setReady] = useState(false)
+  const [debug, setDebug] = useState<DebugInfo | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current!
@@ -22,17 +30,12 @@ export default function GameCanvas() {
       const loaded = await buildSpaceStationRoom(sceneManager.scene)
       console.log('[GameCanvas] Room GLBs loaded:', loaded)
 
-      // Room atmosphere lights
-      // Main room center: tile (5.5,5.5) in 12×12 → world (11,0,11)
-      sceneManager.addRoomLight(11, 3, 11,  0xffcc66, 5, 24)
-      // North room center: tile (5.5,-4.5) → world (11,0,-9)
-      sceneManager.addRoomLight(11, 3, -9,  0x66aaff, 4, 14)
-      // East room center: tile (15,5.5) → world (30,0,11)
-      sceneManager.addRoomLight(30, 3, 11,  0xff8844, 4, 14)
-      // West room center: tile (-4,5.5) → world (-8,0,11)
-      sceneManager.addRoomLight(-8, 3, 11,  0xaa66ff, 4, 14)
-      // Station module center: tile (5.5,15.5) → world (11,0,31)
-      sceneManager.addRoomLight(11, 3, 31,  0x44ffcc, 3, 12)
+      // Room atmosphere lights — single room centered at origin, boundary ±12
+      sceneManager.addRoomLight( 0, 3,  0, 0xffcc66, 6, 28)  // center
+      sceneManager.addRoomLight(-8, 3, -8, 0x66aaff, 3, 12)  // NW corner
+      sceneManager.addRoomLight( 8, 3, -8, 0xff8844, 3, 12)  // NE corner
+      sceneManager.addRoomLight(-8, 3,  8, 0xaa66ff, 3, 12)  // SW corner
+      sceneManager.addRoomLight( 8, 3,  8, 0x44ffcc, 3, 12)  // SE corner
 
       setLoadStatus('Loading character...')
       const player = await Player.load(sceneManager.scene)
@@ -47,6 +50,23 @@ export default function GameCanvas() {
 
       // Snap camera immediately so there's no fly-in from origin
       sceneManager.snapToPlayer(player.position)
+
+      // Collect debug info
+      const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl')
+      const glVersion = gl instanceof WebGL2RenderingContext ? 'WebGL 2' : 'WebGL 1'
+      const srgb = sceneManager.renderer.outputColorSpace === THREE.SRGBColorSpace
+
+      setTimeout(() => {
+        setDebug({
+          npcsLoaded: DEBUG_NPCS_LOADED,
+          webglVersion: glVersion,
+          srgb,
+        })
+        console.log(
+          `[DEBUG] Characters loaded: ${DEBUG_NPCS_LOADED}/18` +
+          ` | Renderer: ${glVersion} | SRGB: ${srgb}`,
+        )
+      }, 500)
 
       setReady(true)
       setLoadStatus('')
@@ -78,6 +98,28 @@ export default function GameCanvas() {
         ref={canvasRef}
         style={{ display: 'block', width: '100%', height: '100%' }}
       />
+      {debug && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            background: 'rgba(0,0,0,0.72)',
+            color: '#0f0',
+            fontFamily: 'monospace',
+            fontSize: 12,
+            padding: '6px 10px',
+            borderRadius: 4,
+            lineHeight: 1.6,
+            pointerEvents: 'none',
+            zIndex: 100,
+          }}
+        >
+          <div>Characters loaded: {debug.npcsLoaded}/18</div>
+          <div>Renderer: {debug.webglVersion}</div>
+          <div>Color space: SRGB {debug.srgb ? 'yes' : 'NO'}</div>
+        </div>
+      )}
       {!ready && (
         <div
           style={{
