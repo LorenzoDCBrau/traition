@@ -21,6 +21,16 @@ export default function GameCanvas() {
       const loaded = await buildSpaceStationRoom(sceneManager.scene)
       console.log('[GameCanvas] Room GLBs loaded:', loaded)
 
+      // Room atmosphere lights at world positions matching the room layout
+      // Main room center (tile 4.5,4.5 → world 9,9)
+      sceneManager.addRoomLight(9,  3, 9,  0xffcc66, 5, 20)
+      // North room (tile 4.5,-4.5 → world 9,-9)
+      sceneManager.addRoomLight(9,  3, -9, 0x66aaff, 4, 14)
+      // East room (tile 13,4.5 → world 26,9)
+      sceneManager.addRoomLight(26, 3, 9,  0xff8844, 4, 14)
+      // West room (tile -4,4.5 → world -8,9)
+      sceneManager.addRoomLight(-8, 3, 9,  0xaa66ff, 4, 14)
+
       setLoadStatus('Loading character...')
       const player = await Player.load(sceneManager.scene)
 
@@ -28,6 +38,9 @@ export default function GameCanvas() {
       const weaponView = await WeaponView.load()
 
       if (disposed) return
+
+      // Snap camera immediately so there's no fly-in from origin
+      sceneManager.snapToPlayer(player.position)
 
       setReady(true)
       setLoadStatus('')

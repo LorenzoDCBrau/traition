@@ -1,33 +1,41 @@
 import * as THREE from 'three'
 import type { WeaponView } from '../weapons/WeaponView'
 
-// Isometric-style offset: camera sits high and behind the player
-const CAM_OFFSET = new THREE.Vector3(0, 14, 10)
-const CAM_LERP = 0.08
+// True isometric offset: equal on all three axes
+const ISO = new THREE.Vector3(20, 20, 20)
 
-// Weapon viewport dimensions (CSS pixels, bottom-right corner)
+// Orthographic frustum height — controls zoom. 24 units ≈ 8 tiles visible vertically.
+const FRUSTUM_H = 24
+
 const WP_W = 220
 const WP_H = 155
 const WP_MARGIN = 12
 
 export class SceneManager {
   scene: THREE.Scene
-  camera: THREE.PerspectiveCamera
+  camera: THREE.OrthographicCamera
   renderer: THREE.WebGLRenderer
 
   private _lookTarget = new THREE.Vector3()
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x0d1117)
-    this.scene.fog = new THREE.FogExp2(0x0d1117, 0.018)
+    this.scene.background = new THREE.Color(0x1a1f2e)
 
     const rect = canvas.getBoundingClientRect()
     const w = rect.width || window.innerWidth
     const h = rect.height || window.innerHeight
+    const aspect = w / h
 
-    this.camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 200)
-    this.camera.position.copy(CAM_OFFSET)
+    this.camera = new THREE.OrthographicCamera(
+      (-FRUSTUM_H * aspect) / 2,
+      (FRUSTUM_H * aspect) / 2,
+      FRUSTUM_H / 2,
+      -FRUSTUM_H / 2,
+      0.1,
+      400,
+    )
+    this.camera.position.copy(ISO)
     this.camera.lookAt(0, 0, 0)
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -35,45 +43,53 @@ export class SceneManager {
     this.renderer.setSize(w, h, false)
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.2
 
     this._setupLights()
     window.addEventListener('resize', this._onResize)
   }
 
   private _setupLights() {
-    // Ambient fill
-    this.scene.add(new THREE.AmbientLight(0x334466, 0.9))
+    // Warm ambient fill
+    this.scene.add(new THREE.AmbientLight(0xfff5e0, 0.6))
 
-    // Key light (sun-like from upper-left)
-    const sun = new THREE.DirectionalLight(0xffffff, 3)
-    sun.position.set(12, 22, 12)
+    // Main directional sun — top-right, soft shadows
+    const sun = new THREE.DirectionalLight(0xfffde7, 2.8)
+    sun.position.set(20, 35, 15)
     sun.castShadow = true
-    sun.shadow.mapSize.set(2048, 2048)
+    sun.shadow.mapSize.set(4096, 4096)
     sun.shadow.camera.near = 1
-    sun.shadow.camera.far = 100
-    sun.shadow.camera.left = -24
-    sun.shadow.camera.right = 24
-    sun.shadow.camera.top = 24
-    sun.shadow.camera.bottom = -24
-    sun.shadow.bias = -0.001
+    sun.shadow.camera.far = 150
+    sun.shadow.camera.left = -40
+    sun.shadow.camera.right = 40
+    sun.shadow.camera.top = 40
+    sun.shadow.camera.bottom = -40
+    sun.shadow.bias = -0.0005
+    sun.shadow.normalBias = 0.02
     this.scene.add(sun)
 
-    // Accent point lights for atmosphere
-    const blue = new THREE.PointLight(0x4488ff, 3, 18)
-    blue.position.set(-6, 3, -6)
-    this.scene.add(blue)
+    // Cool fill from opposite side
+    const fill = new THREE.DirectionalLight(0x99bbff, 0.5)
+    fill.position.set(-10, 10, -10)
+    this.scene.add(fill)
+  }
 
-    const red = new THREE.PointLight(0xff3322, 2, 14)
-    red.position.set(6, 3, 6)
-    this.scene.add(red)
+  /** Place room-atmosphere point lights at world positions */
+  addRoomLight(x: number, y: number, z: number, color = 0xffaa44, intensity = 4, dist = 16) {
+    const light = new THREE.PointLight(color, intensity, dist)
+    light.position.set(x, y, z)
+    this.scene.add(light)
+  }
+
+  /** Instantly snap camera to player position (call once after loading) */
+  snapToPlayer(pos: THREE.Vector3) {
+    this.camera.position.copy(pos.clone().add(ISO))
+    this._lookTarget.copy(pos)
+    this.camera.lookAt(pos)
   }
 
   followPlayer(pos: THREE.Vector3) {
-    this._lookTarget.copy(pos)
-    const target = pos.clone().add(CAM_OFFSET)
-    this.camera.position.lerp(target, CAM_LERP)
+    this.camera.position.lerp(pos.clone().add(ISO), 0.08)
+    this._lookTarget.lerp(pos, 0.08)
     this.camera.lookAt(this._lookTarget)
   }
 
@@ -82,13 +98,13 @@ export class SceneManager {
     const W = canvas.clientWidth || window.innerWidth
     const H = canvas.clientHeight || window.innerHeight
 
-    // --- Main isometric scene ---
+    // Main isometric view
     this.renderer.autoClear = true
     this.renderer.setScissorTest(false)
     this.renderer.setViewport(0, 0, W, H)
     this.renderer.render(this.scene, this.camera)
 
-    // --- Weapon viewport (bottom-right, drawn on top) ---
+    // Weapon viewport — bottom-right corner, drawn on top
     if (weaponView) {
       this.renderer.autoClear = false
       this.renderer.setScissorTest(true)
@@ -103,11 +119,14 @@ export class SceneManager {
   }
 
   private _onResize = () => {
-    const canvas = this.renderer.domElement
-    const rect = canvas.getBoundingClientRect()
-    this.renderer.setSize(rect.width, rect.height, false)
-    this.camera.aspect = rect.width / rect.height
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const aspect = rect.width / rect.height
+    this.camera.left = (-FRUSTUM_H * aspect) / 2
+    this.camera.right = (FRUSTUM_H * aspect) / 2
+    this.camera.top = FRUSTUM_H / 2
+    this.camera.bottom = -FRUSTUM_H / 2
     this.camera.updateProjectionMatrix()
+    this.renderer.setSize(rect.width, rect.height, false)
   }
 
   dispose() {
