@@ -180,7 +180,7 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
   }
 
   // ── Furniture atlas texture ──────────────────────────────────────────────
-  const varTex = texLoader.load('/assets/furniture/variation-a.png')
+  const varTex = texLoader.load('/assets/furniture/colormap.png')
   varTex.colorSpace = THREE.SRGBColorSpace
 
   // ── Load spacekit structure assets ───────────────────────────────────────
@@ -274,9 +274,12 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
 
   const placeDeco = (raw: THREE.Group | null, tx: number, tz: number, rotY = 0) => {
     if (!raw) return
+    const wx = tx * TILE + WORLD_OFFSET
+    const wz = tz * TILE + WORLD_OFFSET
+    if (wx < -12 || wx > 12 || wz < -12 || wz > 12) return
     const clone = raw.clone(true)
     const y = fitToGrid(clone, DECO)
-    clone.position.set(tx * TILE + WORLD_OFFSET, y, tz * TILE + WORLD_OFFSET)
+    clone.position.set(wx, y, wz)
     clone.rotation.y = rotY
     enableShadows(clone)
     scene.add(clone)
@@ -311,9 +314,12 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
 
   const putFurn = (raw: THREE.Group | null, tx: number, tz: number, rotY = 0) => {
     if (!raw) return
+    const wx = tx * TILE + WORLD_OFFSET
+    const wz = tz * TILE + WORLD_OFFSET
+    if (wx < -12 || wx > 12 || wz < -12 || wz > 12) return
     const clone = raw.clone(true)
     const y = fitToGrid(clone, FURN)
-    clone.position.set(tx * TILE + WORLD_OFFSET, y, tz * TILE + WORLD_OFFSET)
+    clone.position.set(wx, y, wz)
     clone.rotation.y = rotY
     enableShadows(clone)
     scene.add(clone)

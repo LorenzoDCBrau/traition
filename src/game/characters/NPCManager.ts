@@ -65,7 +65,10 @@ export async function spawnNPCs(scene: THREE.Scene): Promise<void> {
 
       model.traverse((n) => {
         if (n instanceof THREE.Mesh) {
-          n.material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, metalness: 0.0 })
+          const mat = (n.material as THREE.MeshStandardMaterial).clone()
+          mat.map = texture
+          mat.needsUpdate = true
+          n.material = mat
           n.castShadow = true
           n.receiveShadow = true
         }

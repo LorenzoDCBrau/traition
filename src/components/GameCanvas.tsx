@@ -15,11 +15,15 @@ type DebugInfo = {
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const initializedRef = useRef(false)
   const [loadStatus, setLoadStatus] = useState<string>('Initializing...')
   const [ready, setReady] = useState(false)
   const [debug, setDebug] = useState<DebugInfo | null>(null)
 
   useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
+
     const canvas = canvasRef.current!
     const sceneManager = new SceneManager(canvas)
     let loop: GameLoop | null = null
