@@ -2,30 +2,31 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { FLOOR_LEVEL } from '../world/RoomBuilder'
 
-const TARGET_HEIGHT = 2.0 // world units
+const TARGET_HEIGHT = 2.0
 const SPEED = 5
+const BOUNDARY = 11
 
 export class Player {
   model: THREE.Group
   position: THREE.Vector3
+
+  onInteract?: () => void
+  onReport?: () => void
 
   private keys = new Set<string>()
   private _keyDown: (e: KeyboardEvent) => void
   private _keyUp: (e: KeyboardEvent) => void
 
   private constructor(scene: THREE.Scene, model: THREE.Group) {
-    // Scale character to TARGET_HEIGHT
     model.updateMatrixWorld(true)
     const b = new THREE.Box3().setFromObject(model)
     const h = b.max.y - b.min.y
     if (h > 0.001) model.scale.setScalar(TARGET_HEIGHT / h)
     model.updateMatrixWorld(true)
 
-    // Sit on top of floor surface — bottom of character at FLOOR_LEVEL
     const b2 = new THREE.Box3().setFromObject(model)
     const startY = FLOOR_LEVEL - b2.min.y
 
-    // Start at center of main room (world origin, room spans -12 to 12)
     this.position = new THREE.Vector3(0, startY, 0)
     model.position.copy(this.position)
 
@@ -39,7 +40,11 @@ export class Player {
     this.model = model
     scene.add(model)
 
-    this._keyDown = (e) => this.keys.add(e.code)
+    this._keyDown = (e) => {
+      this.keys.add(e.code)
+      if (e.code === 'KeyE') this.onInteract?.()
+      if (e.code === 'KeyF') this.onReport?.()
+    }
     this._keyUp = (e) => this.keys.delete(e.code)
     window.addEventListener('keydown', this._keyDown)
     window.addEventListener('keyup', this._keyUp)
@@ -61,7 +66,11 @@ export class Player {
       const model = gltf.scene
       model.traverse((n) => {
         if (n instanceof THREE.Mesh) {
-          n.material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, metalness: 0.0 })
+          n.material = new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.7,
+            metalness: 0.0,
+          })
         }
       })
       console.log(`[Player] ✓ ${glbUrl}`)
@@ -90,9 +99,14 @@ export class Player {
       dir.normalize()
       this.position.x += dir.x * SPEED * dt
       this.position.z += dir.z * SPEED * dt
-      this.model.position.set(this.position.x, this.position.y, this.position.z)
       this.model.rotation.y = Math.atan2(dir.x, dir.z)
     }
+
+    // Clamp inside room
+    this.position.x = Math.max(-BOUNDARY, Math.min(BOUNDARY, this.position.x))
+    this.position.z = Math.max(-BOUNDARY, Math.min(BOUNDARY, this.position.z))
+
+    this.model.position.set(this.position.x, this.position.y, this.position.z)
   }
 
   dispose() {
