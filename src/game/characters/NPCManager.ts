@@ -5,7 +5,6 @@ import { NPC, NPC_NAMES } from './NPC'
 import type { Role } from '../roles/RoleSystem'
 
 const loader = new GLTFLoader()
-const texLoader = new THREE.TextureLoader()
 
 const TARGET_HEIGHT = 2.0
 
@@ -40,7 +39,6 @@ export async function spawnNPCs(scene: THREE.Scene, roles: Role[]): Promise<NPC[
   DEBUG_NPCS_LOADED = 0
   _loadedIds.clear()
 
-  // Shuffle NPC_NAMES for this session
   const namePool = [...NPC_NAMES].sort(() => Math.random() - 0.5)
 
   for (let i = 0; i < NPC_IDS.length; i++) {
@@ -55,53 +53,19 @@ export async function spawnNPCs(scene: THREE.Scene, roles: Role[]): Promise<NPC[
     const name = namePool[i % namePool.length]
 
     try {
-      const texPath = `/assets/characters/texture-${id}.png`
-      console.log(`[NPC] Loading texture: ${texPath}`)
-
-      const [gltf, texture] = await Promise.all([
-        new Promise<{ scene: THREE.Group }>((res, rej) =>
-          loader.load(
-            `/assets/characters/character-${id}.glb`,
-            res as never,
-            undefined,
-            (e) => { console.error(`[NPC] GLB error character-${id}:`, e); rej(e) },
-          ),
+      const gltf = await new Promise<{ scene: THREE.Group }>((res, rej) =>
+        loader.load(
+          `/assets/characters/character-${id}.glb`,
+          res as never,
+          undefined,
+          (e) => { console.error(`[NPC] GLB error character-${id}:`, e); rej(e) },
         ),
-        new Promise<THREE.Texture>((res, rej) =>
-          texLoader.load(
-            texPath,
-            (tex) => { console.log(`[NPC] Texture OK: ${texPath}`, tex); res(tex) },
-            undefined,
-            (err) => { console.error(`[NPC] Texture error: ${texPath}`, err); rej(err) },
-          ),
-        ),
-      ])
-
-      // GLB UVs use bottom-left origin — must disable flipY to match
-      texture.flipY = false
-      texture.colorSpace = THREE.SRGBColorSpace
-      texture.needsUpdate = true
+      )
 
       const model = gltf.scene
 
       model.traverse((n) => {
         if (n instanceof THREE.Mesh) {
-          console.log('[DIAG] Material type:', (n.material as THREE.MeshStandardMaterial).type)
-          console.log('[DIAG] Has map:', !!(n.material as THREE.MeshStandardMaterial).map)
-          console.log('[DIAG] Map src:', (n.material as THREE.MeshStandardMaterial).map?.source?.data?.src || 'no src')
-          const mat = Array.isArray(n.material) ? n.material[0] : n.material
-          console.log(`[NPC-DIAG character-${id}] Material type:`, mat.type)
-          console.log(`[NPC-DIAG character-${id}] Has map:`, !!(mat as THREE.MeshStandardMaterial).map)
-          console.log(`[NPC-DIAG character-${id}] Map image:`, (mat as THREE.MeshStandardMaterial).map?.image?.src ?? (mat as THREE.MeshStandardMaterial).map?.image)
-
-          const oldMat = n.material as THREE.MeshStandardMaterial
-          n.material = new THREE.MeshBasicMaterial({
-            map: texture,
-            transparent: oldMat.transparent,
-            alphaTest: oldMat.alphaTest,
-            side: THREE.DoubleSide,
-          })
-          n.material.needsUpdate = true
           n.castShadow = true
           n.receiveShadow = true
         }

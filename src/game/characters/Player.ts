@@ -52,34 +52,12 @@ export class Player {
 
   static async load(scene: THREE.Scene): Promise<Player> {
     const glbUrl = '/assets/characters/character-a.glb'
-    const texUrl = '/assets/characters/texture-a.png'
     try {
-      const [gltf, texture] = await Promise.all([
-        new Promise<{ scene: THREE.Group }>((res, rej) =>
-          new GLTFLoader().load(glbUrl, res as never, undefined, rej),
-        ),
-        new Promise<THREE.Texture>((res, rej) =>
-          new THREE.TextureLoader().load(texUrl, res, undefined, rej),
-        ),
-      ])
-      texture.flipY = false
-      texture.colorSpace = THREE.SRGBColorSpace
-      texture.needsUpdate = true
-      const model = gltf.scene
-      model.traverse((n) => {
-        if (n instanceof THREE.Mesh) {
-          const oldMat = n.material as THREE.MeshStandardMaterial
-          n.material = new THREE.MeshBasicMaterial({
-            map: texture,
-            transparent: oldMat.transparent,
-            alphaTest: oldMat.alphaTest,
-            side: THREE.DoubleSide,
-          })
-          n.material.needsUpdate = true
-        }
-      })
+      const gltf = await new Promise<{ scene: THREE.Group }>((res, rej) =>
+        new GLTFLoader().load(glbUrl, res as never, undefined, rej),
+      )
       console.log(`[Player] ✓ ${glbUrl}`)
-      return new Player(scene, model)
+      return new Player(scene, gltf.scene)
     } catch (err) {
       console.warn(`[Player] Failed to load ${glbUrl}, using fallback cube:`, err)
       const group = new THREE.Group()
