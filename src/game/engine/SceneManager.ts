@@ -7,9 +7,9 @@ const ISO = new THREE.Vector3(20, 20, 20)
 // Orthographic frustum height — controls zoom. 24 units ≈ 8 tiles visible vertically.
 const FRUSTUM_H = 24
 
-const WP_W = 220
-const WP_H = 155
-const WP_MARGIN = 12
+const WP_W = 120
+const WP_H = 120
+const WP_MARGIN = 20
 
 export class SceneManager {
   scene: THREE.Scene

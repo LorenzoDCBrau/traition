@@ -11,13 +11,13 @@ export let FLOOR_LEVEL = 0
 
 // ─── Loaders ──────────────────────────────────────────────────────────────────
 
+const COLORMAP_URL = `${STATION}Textures/colormap.png`
+
 async function loadOBJ(name: string): Promise<THREE.Group | null> {
   return new Promise((resolve) => {
     const mtl = new MTLLoader()
-    // setPath = where to find the .mtl file
-    // setResourcePath = where to find textures referenced inside the .mtl
     mtl.setPath(STATION)
-    mtl.setResourcePath(STATION)
+    mtl.setResourcePath(`${STATION}Textures/`)
     console.log(`[RoomBuilder] Loading MTL: ${STATION}${name}.mtl`)
     mtl.load(
       `${name}.mtl`,
@@ -30,6 +30,18 @@ async function loadOBJ(name: string): Promise<THREE.Group | null> {
           `${STATION}${name}.obj`,
           (group) => {
             console.log(`[RoomBuilder] OBJ OK: ${name}`)
+            // Force colormap texture on all meshes as fallback
+            const tex = new THREE.TextureLoader().load(COLORMAP_URL)
+            tex.colorSpace = THREE.SRGBColorSpace
+            group.traverse((node) => {
+              if (node instanceof THREE.Mesh) {
+                const mat = node.material as THREE.MeshStandardMaterial
+                if (!mat.map) {
+                  mat.map = tex
+                  mat.needsUpdate = true
+                }
+              }
+            })
             LOADED_GLBS.push(`${name}.obj`)
             resolve(group)
           },
@@ -191,8 +203,15 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
 
   const floorY  = bottomOffset(floorTpl)
   const wallY   = bottomOffset(wallTpl)
-  const cornerY = bottomOffset(cornerTpl)
-  const doorY   = bottomOffset(doorTpl)
+  bottomOffset(cornerTpl)  // measure only, use wallY for placement
+  bottomOffset(doorTpl)    // measure only, use wallY for placement
+
+  // Compute wall top height for ceiling placement
+  wallTpl.position.set(0, wallY, 0)
+  wallTpl.updateMatrixWorld(true)
+  const WALL_TOP = box3(wallTpl).max.y
+  wallTpl.position.set(0, 0, 0)
+  wallTpl.updateMatrixWorld(true)
 
   // ── Furniture templates ──────────────────────────────────────────────────
   const compTpl  = computerM ?? makeFallback(0.7, 1.2, 0.5, 0x334466)
@@ -245,50 +264,59 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
       placeClone(floorTpl, scene, wx, floorY, wz, 0)
     } else if (entry.type === 'wall') {
       if (doorKeys.has(key)) {
-        placeClone(doorTpl, scene, wx, doorY, wz, entry.rotY)
+        placeClone(doorTpl, scene, wx, wallY, wz, entry.rotY)
       } else {
         placeClone(wallTpl, scene, wx, wallY, wz, entry.rotY)
       }
     } else if (entry.type === 'corner') {
-      placeClone(cornerTpl, scene, wx, cornerY, wz, entry.rotY)
+      placeClone(cornerTpl, scene, wx, wallY, wz, entry.rotY)
     }
   }
 
+  // ── Ceiling — inverted floor tile at wall height for all floor tiles ────
+  for (const [key, entry] of tileMap) {
+    if (entry.type !== 'floor') continue
+    const [txs, tzs] = key.split(',')
+    const wx = +txs * TILE + WORLD_OFFSET
+    const wz = +tzs * TILE + WORLD_OFFSET
+    const ceil = floorTpl.clone(true)
+    ceil.position.set(wx, WALL_TOP, wz)
+    ceil.rotation.x = Math.PI
+    enableShadows(ceil)
+    scene.add(ceil)
+  }
+
   // ── Furniture — main room ────────────────────────────────────────────────
-  // Computer bank along north interior wall
   for (const tx of [2, 3, 4, 5]) {
     placeClone(compTpl, scene, tw(tx), compY, tw(1), Math.PI)
   }
-  // Tables in center
   placeClone(tableTpl, scene, tw(2), tableY, tw(4), 0)
   placeClone(tableTpl, scene, tw(5), tableY, tw(4), 0)
   placeClone(tableTpl, scene, tw(2), tableY, tw(6), 0)
   placeClone(tableTpl, scene, tw(5), tableY, tw(6), 0)
-  // Chairs around tables
   placeClone(chairTpl, scene, tw(2), chairY, tw(3), 0)
   placeClone(chairTpl, scene, tw(5), chairY, tw(3), 0)
   placeClone(chairTpl, scene, tw(2), chairY, tw(5), Math.PI)
   placeClone(chairTpl, scene, tw(5), chairY, tw(5), Math.PI)
 
-  // ── Furniture — north room ───────────────────────────────────────────────
+  // ── Furniture — north room: 2 computers + 1 table ───────────────────────
   placeClone(compTpl, scene, tw(3), compY, tw(-4), 0)
   placeClone(compTpl, scene, tw(4), compY, tw(-4), 0)
   placeClone(tableTpl, scene, tw(3), tableY, tw(-5), 0)
-  placeClone(chairTpl, scene, tw(4), chairY, tw(-5), Math.PI / 2)
 
-  // ── Furniture — south room ───────────────────────────────────────────────
-  placeClone(compTpl, scene, tw(3), compY, tw(11), Math.PI)
-  placeClone(compTpl, scene, tw(4), compY, tw(11), Math.PI)
+  // ── Furniture — south room: 2 chairs + 1 table ──────────────────────────
+  placeClone(chairTpl, scene, tw(3), chairY, tw(11), Math.PI)
+  placeClone(chairTpl, scene, tw(4), chairY, tw(11), Math.PI)
   placeClone(tableTpl, scene, tw(3), tableY, tw(12), Math.PI)
 
-  // ── Furniture — west room ────────────────────────────────────────────────
+  // ── Furniture — west room: 2 tables ─────────────────────────────────────
   placeClone(tableTpl, scene, tw(-4), tableY, tw(3), Math.PI / 2)
-  placeClone(chairTpl, scene, tw(-4), chairY, tw(4), -Math.PI / 2)
+  placeClone(tableTpl, scene, tw(-4), tableY, tw(4), Math.PI / 2)
 
-  // ── Furniture — east room ────────────────────────────────────────────────
+  // ── Furniture — east room: 1 computer + 2 chairs ────────────────────────
   placeClone(compTpl, scene, tw(11), compY, tw(3), -Math.PI / 2)
-  placeClone(compTpl, scene, tw(11), compY, tw(4), -Math.PI / 2)
-  placeClone(tableTpl, scene, tw(12), tableY, tw(3), Math.PI / 2)
+  placeClone(chairTpl, scene, tw(12), chairY, tw(3), Math.PI / 2)
+  placeClone(chairTpl, scene, tw(12), chairY, tw(4), Math.PI / 2)
 
   console.log(`[RoomBuilder] ${LOADED_GLBS.length} station models loaded:`)
   LOADED_GLBS.forEach((n) => console.log(`  ✓ ${n}`))

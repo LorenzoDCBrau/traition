@@ -4,7 +4,20 @@ import { FLOOR_LEVEL } from '../world/RoomBuilder'
 
 const TARGET_HEIGHT = 2.0
 const SPEED = 5
-const BOUNDARY = 11
+
+// Room bounding boxes derived from tile layout (tw(t) = t*2-7)
+function isWalkable(x: number, z: number): boolean {
+  if (x >= -8 && x <= 8  && z >= -8 && z <= 8)   return true  // main room
+  if (x >= -2 && x <= 2  && z >= -12 && z <= -8)  return true  // north corridor
+  if (x >= -4 && x <= 4  && z >= -20 && z <= -12) return true  // north room
+  if (x >= -2 && x <= 2  && z >= 8   && z <= 12)  return true  // south corridor
+  if (x >= -4 && x <= 4  && z >= 12  && z <= 20)  return true  // south room
+  if (x >= -12 && x <= -8 && z >= -2 && z <= 2)   return true  // west corridor
+  if (x >= -20 && x <= -12 && z >= -4 && z <= 4)  return true  // west room
+  if (x >= 8  && x <= 12 && z >= -2 && z <= 2)    return true  // east corridor
+  if (x >= 12 && x <= 20 && z >= -4 && z <= 4)    return true  // east room
+  return false
+}
 
 export class Player {
   model: THREE.Group
@@ -80,14 +93,12 @@ export class Player {
 
     if (dir.lengthSq() > 0) {
       dir.normalize()
-      this.position.x += dir.x * SPEED * dt
-      this.position.z += dir.z * SPEED * dt
+      const newX = this.position.x + dir.x * SPEED * dt
+      const newZ = this.position.z + dir.z * SPEED * dt
+      if (isWalkable(newX, this.position.z)) this.position.x = newX
+      if (isWalkable(this.position.x, newZ)) this.position.z = newZ
       this.model.rotation.y = Math.atan2(dir.x, dir.z)
     }
-
-    // Clamp inside room
-    this.position.x = Math.max(-BOUNDARY, Math.min(BOUNDARY, this.position.x))
-    this.position.z = Math.max(-BOUNDARY, Math.min(BOUNDARY, this.position.z))
 
     this.model.position.set(this.position.x, this.position.y, this.position.z)
   }

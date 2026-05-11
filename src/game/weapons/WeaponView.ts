@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
-const WP_W = 220
-const WP_H = 155
+const WP_W = 120
+const WP_H = 120
 
 export class WeaponView {
   scene: THREE.Scene

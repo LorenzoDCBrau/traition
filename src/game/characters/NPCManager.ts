@@ -6,30 +6,38 @@ import type { Role } from '../roles/RoleSystem'
 
 const loader = new GLTFLoader()
 
-const TARGET_HEIGHT = 2.0
-
 const NPC_IDS = ['b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r']
 
 export let DEBUG_NPCS_LOADED = 0
 
+const MAX_BOUND = 11
+
+// [wx, wz, rotY] — spread across all rooms
 const NPC_PLACEMENTS: [number, number, number][] = [
-  [-7, -7,  0.0],
-  [ 7, -7,  Math.PI],
-  [-7,  7,  0.5],
-  [ 7,  7, -0.5],
+  // Main room
+  [-3, -3,  0],
+  [-1, -2,  Math.PI / 4],
+  [ 1, -3,  Math.PI],
+  [ 3, -2, -Math.PI / 4],
+  [-2,  0,  Math.PI / 2],
+  [ 2,  0, -Math.PI / 2],
+  [-3,  2,  Math.PI / 3],
+  [ 0,  3, -Math.PI / 6],
+  [ 3,  2,  Math.PI],
+  // North room
   [-1, -9,  Math.PI],
   [ 1, -9,  Math.PI],
-  [-9, -1, -Math.PI / 2],
-  [ 9, -1,  Math.PI / 2],
+  [ 0, -11, Math.PI],
+  // South room
   [-1,  9,  0],
   [ 1,  9,  0],
-  [-5,  1,  Math.PI / 3],
-  [ 5,  1, -Math.PI / 3],
-  [-3, -7,  0],
-  [ 3, -7,  Math.PI / 2],
-  [ 7,  3,  Math.PI / 2],
-  [-7,  3, -Math.PI / 4],
-  [ 0,  7,  0],
+  [ 0,  11, 0],
+  // East room
+  [ 9, -1,  Math.PI / 2],
+  [ 9,  1,  Math.PI / 2],
+  // West room
+  [-9, -1, -Math.PI / 2],
+  [-9,  1, -Math.PI / 2],
 ]
 
 const _loadedIds = new Set<string>()
@@ -71,18 +79,21 @@ export async function spawnNPCs(scene: THREE.Scene, roles: Role[]): Promise<NPC[
         }
       })
 
-      model.updateMatrixWorld(true)
-      const b = new THREE.Box3().setFromObject(model)
-      const h = b.max.y - b.min.y
-      if (h > 0.001) model.scale.setScalar(TARGET_HEIGHT / h)
+      // Uniform scale — GLBs are pre-sized correctly
+      model.scale.setScalar(1.0)
       model.updateMatrixWorld(true)
 
       const b2 = new THREE.Box3().setFromObject(model)
       const startY = FLOOR_LEVEL - b2.min.y
-      model.position.set(wx, startY, wz)
+
+      // Clamp spawn within walkable bounds
+      const clampedX = Math.max(-MAX_BOUND, Math.min(MAX_BOUND, wx))
+      const clampedZ = Math.max(-MAX_BOUND, Math.min(MAX_BOUND, wz))
+
+      model.position.set(clampedX, startY, clampedZ)
       model.rotation.y = rotY
 
-      const startPos = new THREE.Vector3(wx, startY, wz)
+      const startPos = new THREE.Vector3(clampedX, startY, clampedZ)
       scene.add(model)
 
       const npc = new NPC(`npc-${i}`, name, role, model, startPos, scene)

@@ -7,11 +7,13 @@ interface Props {
 }
 
 const MAP_SIZE = 150
-const ROOM = 24  // world units
+const ROOM = 48  // world units — covers all rooms (max extent ~±20)
+
+const SCALE = MAP_SIZE / ROOM
 
 function worldToMap(wx: number, wz: number): [number, number] {
-  const x = ((wx + ROOM / 2) / ROOM) * MAP_SIZE
-  const y = ((wz + ROOM / 2) / ROOM) * MAP_SIZE
+  const x = MAP_SIZE / 2 + wx * SCALE
+  const y = MAP_SIZE / 2 + wz * SCALE
   return [x, y]
 }
 

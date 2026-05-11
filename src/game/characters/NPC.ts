@@ -31,8 +31,10 @@ export class NPC {
   private wanderTarget: THREE.Vector3
   private missionTarget: THREE.Vector3 | null = null
   missionId: string | null = null
-  private missionTimer = 0   // seconds at mission site
+  private missionTimer = 0
   private killCooldown = 0
+  private spawnX: number
+  private spawnZ: number
 
   constructor(
     id: string,
@@ -48,6 +50,8 @@ export class NPC {
     this.model = model
     this.scene = scene
     this.position = startPos.clone()
+    this.spawnX = startPos.x
+    this.spawnZ = startPos.z
     this.wanderTarget = this._randomWanderPoint()
     this.nameSprite = this._makeLabel(name, role)
     scene.add(this.nameSprite)
@@ -195,11 +199,11 @@ export class NPC {
   }
 
   private _randomWanderPoint(): THREE.Vector3 {
-    return new THREE.Vector3(
-      (Math.random() - 0.5) * BOUNDARY * 2,
-      this.position?.y ?? 0,
-      (Math.random() - 0.5) * BOUNDARY * 2,
-    )
+    const sx = this.spawnX ?? 0
+    const sz = this.spawnZ ?? 0
+    const x = Math.max(-BOUNDARY, Math.min(BOUNDARY, sx + (Math.random() - 0.5) * 4))
+    const z = Math.max(-BOUNDARY, Math.min(BOUNDARY, sz + (Math.random() - 0.5) * 4))
+    return new THREE.Vector3(x, this.position?.y ?? 0, z)
   }
 
   private _makeLabel(name: string, role: Role): THREE.Sprite {
@@ -208,10 +212,15 @@ export class NPC {
     canvas.height = 64
     const ctx = canvas.getContext('2d')!
     ctx.clearRect(0, 0, 256, 64)
-    ctx.font = 'bold 28px monospace'
+    // Background pill
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'
+    ctx.beginPath()
+    ctx.roundRect(10, 8, 236, 46, 6)
+    ctx.fill()
+    ctx.font = 'bold 26px monospace'
     ctx.textAlign = 'center'
     ctx.fillStyle = role === 'TRAITOR' ? '#ff4444' : role === 'DETECTIVE' ? '#ffcc00' : '#88ddff'
-    ctx.fillText(name, 128, 44)
+    ctx.fillText(name, 128, 42)
 
     const tex = new THREE.CanvasTexture(canvas)
     const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false })

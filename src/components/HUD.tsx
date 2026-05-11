@@ -44,7 +44,7 @@ function fmtCooldown(s: SabotageState): string {
 export default function HUD({
   gsm,
   playerPos,
-  missionProgress,
+  missionProgress: _missionProgressProp,
   playerRole,
   players,
   nearMission,
@@ -57,6 +57,9 @@ export default function HUD({
 }: Props) {
   const roleColor = ROLE_COLORS[playerRole]
   const aliveList = players.filter((p) => p.alive)
+  const totalMissions = gsm?.missions.length ?? 1
+  const completedMissions = gsm?.missions.filter((m) => m.completed).length ?? 0
+  const missionProgress = Math.round((completedMissions / totalMissions) * 100)
 
   return (
     <div
