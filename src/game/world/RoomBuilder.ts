@@ -14,29 +14,35 @@ export let FLOOR_LEVEL = 0
 async function loadOBJ(name: string): Promise<THREE.Group | null> {
   return new Promise((resolve) => {
     const mtl = new MTLLoader()
+    // setPath = where to find the .mtl file
+    // setResourcePath = where to find textures referenced inside the .mtl
     mtl.setPath(STATION)
+    mtl.setResourcePath(STATION)
+    console.log(`[RoomBuilder] Loading MTL: ${STATION}${name}.mtl`)
     mtl.load(
       `${name}.mtl`,
       (materials) => {
         materials.preload()
+        console.log(`[RoomBuilder] MTL OK: ${name}, materials:`, Object.keys(materials.materialsInfo))
         const obj = new OBJLoader()
         obj.setMaterials(materials)
         obj.load(
           `${STATION}${name}.obj`,
           (group) => {
+            console.log(`[RoomBuilder] OBJ OK: ${name}`)
             LOADED_GLBS.push(`${name}.obj`)
             resolve(group)
           },
           undefined,
-          () => {
-            console.warn(`[RoomBuilder] ✗ OBJ: ${name}`)
+          (err) => {
+            console.error(`[RoomBuilder] ✗ OBJ: ${name}`, err)
             resolve(null)
           },
         )
       },
       undefined,
-      () => {
-        console.warn(`[RoomBuilder] ✗ MTL: ${name}`)
+      (err) => {
+        console.error(`[RoomBuilder] ✗ MTL: ${name}`, err)
         resolve(null)
       },
     )

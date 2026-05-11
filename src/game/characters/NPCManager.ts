@@ -55,26 +55,40 @@ export async function spawnNPCs(scene: THREE.Scene, roles: Role[]): Promise<NPC[
     const name = namePool[i % namePool.length]
 
     try {
+      const texPath = `/assets/characters/texture-${id}.png`
+      console.log(`[NPC] Loading texture: ${texPath}`)
+
       const [gltf, texture] = await Promise.all([
         new Promise<{ scene: THREE.Group }>((res, rej) =>
           loader.load(
             `/assets/characters/character-${id}.glb`,
             res as never,
             undefined,
-            (e) => rej(e),
+            (e) => { console.error(`[NPC] GLB error character-${id}:`, e); rej(e) },
           ),
         ),
         new Promise<THREE.Texture>((res, rej) =>
-          texLoader.load(`/assets/characters/texture-${id}.png`, res, undefined, rej),
+          texLoader.load(
+            texPath,
+            (tex) => { console.log(`[NPC] Texture OK: ${texPath}`, tex); res(tex) },
+            undefined,
+            (err) => { console.error(`[NPC] Texture error: ${texPath}`, err); rej(err) },
+          ),
         ),
       ])
+
+      // GLB UVs use bottom-left origin — must disable flipY to match
+      texture.flipY = false
       texture.colorSpace = THREE.SRGBColorSpace
+      texture.needsUpdate = true
+
       const model = gltf.scene
 
       model.traverse((n) => {
         if (n instanceof THREE.Mesh) {
           const mat = (n.material as THREE.MeshStandardMaterial).clone()
           mat.map = texture
+          mat.map.needsUpdate = true
           mat.needsUpdate = true
           n.material = mat
           n.castShadow = true

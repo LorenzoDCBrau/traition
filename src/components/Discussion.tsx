@@ -20,25 +20,25 @@ const NPC_COMMENTS = [
   "Who was near the body last?",
 ]
 
+const CHAT_TIME   = 30
+const VOTE_TIME   = 20
+
 export default function Discussion({ gsm, players, playerRole, onVotingDone }: Props) {
   const [phase, setPhase] = useState<'CHAT' | 'VOTING'>('CHAT')
   const [messages, setMessages] = useState<Array<{ author: string; text: string; key: number }>>([])
   const [votes, setVotes] = useState<Record<string, string>>({})
   const [playerVote, setPlayerVote] = useState<string | null>(null)
-  const [timeLeft, setTimeLeft] = useState(60)
+  const [timeLeft, setTimeLeft] = useState(CHAT_TIME)
   const [revealedRole, setRevealedRole] = useState<{ name: string; role: Role } | null>(null)
   const [chatInput, setChatInput] = useState('')
   const chatRef = useRef<HTMLDivElement>(null)
   const keyRef = useRef(0)
 
-  // Auto-scroll chat
   useEffect(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight
-    }
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
   }, [messages])
 
-  // Timer countdown
+  // ── Timer ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const iv = setInterval(() => {
       setTimeLeft((t) => {
@@ -46,14 +46,11 @@ export default function Discussion({ gsm, players, playerRole, onVotingDone }: P
           clearInterval(iv)
           if (phase === 'CHAT') {
             setPhase('VOTING')
-            setTimeLeft(30)
+            setTimeLeft(VOTE_TIME)
             gsm.startVoting()
-            // NPC votes
             scheduleNPCVotes()
           } else {
-            // Resolve vote
-            const ejected = gsm.resolveVote()
-            onVotingDone(ejected)
+            onVotingDone(gsm.resolveVote())
           }
           return 0
         }
@@ -63,42 +60,35 @@ export default function Discussion({ gsm, players, playerRole, onVotingDone }: P
     return () => clearInterval(iv)
   }, [phase]) // eslint-disable-line
 
-  // NPC auto-chat during discussion
+  // ── NPC auto-chat ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'CHAT') return
     const aliveNPCs = players.filter((p) => !p.isHuman && p.alive)
-
     const timeouts: ReturnType<typeof setTimeout>[] = []
-    aliveNPCs.slice(0, 5).forEach((npc, i) => {
-      const delay = 3000 + i * 5000 + Math.random() * 3000
-      timeouts.push(
-        setTimeout(() => {
-          const text = NPC_COMMENTS[Math.floor(Math.random() * NPC_COMMENTS.length)]
-          setMessages((m) => [...m, { author: npc.name, text, key: keyRef.current++ }])
-          gsm.addChatMessage(npc.name, text)
-        }, delay),
-      )
+    aliveNPCs.slice(0, 4).forEach((npc, i) => {
+      const delay = 2000 + i * 4500 + Math.random() * 2000
+      timeouts.push(setTimeout(() => {
+        const text = NPC_COMMENTS[Math.floor(Math.random() * NPC_COMMENTS.length)]
+        setMessages((m) => [...m, { author: npc.name, text, key: keyRef.current++ }])
+        gsm.addChatMessage(npc.name, text)
+      }, delay))
     })
-
     return () => timeouts.forEach(clearTimeout)
   }, [phase]) // eslint-disable-line
 
   function scheduleNPCVotes() {
     const aliveNPCs = players.filter((p) => !p.isHuman && p.alive)
     const targets = players.filter((p) => p.alive)
-
     aliveNPCs.forEach((npc, i) => {
       setTimeout(() => {
-        // Traitors don't vote for each other
         const pool = npc.role === 'TRAITOR'
           ? targets.filter((t) => t.role !== 'TRAITOR' && t.alive)
           : targets.filter((t) => t.id !== npc.id && t.alive)
-
-        if (pool.length === 0) return
+        if (!pool.length) return
         const target = pool[Math.floor(Math.random() * pool.length)]
         gsm.vote(npc.id, target.id)
         setVotes((v) => ({ ...v, [npc.id]: target.id }))
-      }, 1000 + i * 1200)
+      }, 800 + i * 1000)
     })
   }
 
@@ -136,62 +126,69 @@ export default function Discussion({ gsm, players, playerRole, onVotingDone }: P
 
   const alivePlayers = players.filter((p) => p.alive)
   const detectiveCanReveal = playerRole === 'DETECTIVE' && !gsm.players.find((p) => p.isHuman)?.revealUsed
+  const timerPct = (timeLeft / (phase === 'CHAT' ? CHAT_TIME : VOTE_TIME)) * 100
+  const timerColor = timeLeft <= 5 ? '#ff4444' : phase === 'VOTING' ? '#ff8844' : '#ffcc00'
 
   return (
     <div
       style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(4,8,16,0.95)',
-        zIndex: 400,
-        display: 'flex',
-        flexDirection: 'column',
-        fontFamily: 'monospace',
-        color: '#fff',
+        position: 'absolute', inset: 0,
+        background: 'rgba(4,8,16,0.96)',
+        zIndex: 400, display: 'flex', flexDirection: 'column',
+        fontFamily: 'monospace', color: '#fff',
       }}
     >
-      {/* Header */}
+      {/* ── Header with big timer ────────────────────────────────────────── */}
       <div
         style={{
-          background: '#0a0f1e',
+          background: '#08101e',
           borderBottom: '1px solid #223',
-          padding: '12px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          padding: '14px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}
       >
-        <div>
-          <span style={{ fontSize: 18, fontWeight: 'bold', letterSpacing: 3, color: phase === 'CHAT' ? '#ffcc00' : '#ff4444' }}>
-            {phase === 'CHAT' ? '⚠ BODY REPORTED' : '🗳 VOTING'}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 20, fontWeight: 'bold', letterSpacing: 3, color: phase === 'CHAT' ? '#ffcc00' : '#ff4444' }}>
+            {phase === 'CHAT' ? '⚠ BODY REPORTED' : '🗳 VOTE NOW'}
           </span>
-          <span style={{ fontSize: 12, opacity: 0.5, marginLeft: 16 }}>
+          <span style={{ fontSize: 12, opacity: 0.45 }}>
             {gsm.discussion?.bodyOf} was found dead
           </span>
         </div>
-        <div style={{ fontSize: 24, fontWeight: 'bold', color: timeLeft < 10 ? '#ff4444' : '#fff' }}>
-          {timeLeft}s
+
+        {/* Timer circle */}
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 42, fontWeight: 'bold', color: timerColor, lineHeight: 1 }}>
+            {timeLeft}
+          </div>
+          <div style={{ fontSize: 10, letterSpacing: 2, opacity: 0.5, marginTop: 2 }}>
+            {phase === 'CHAT' ? 'DISCUSS' : 'VOTE'}
+          </div>
+          {/* Progress bar */}
+          <div style={{ width: 60, height: 4, background: '#1a2030', borderRadius: 2, marginTop: 4, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${timerPct}%`, background: timerColor, transition: 'width 1s linear, background 0.3s', borderRadius: 2 }} />
+          </div>
         </div>
       </div>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Chat / Voting left panel */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid #223' }}>
-          {/* Messages */}
+
+        {/* ── Left: chat ──────────────────────────────────────────────────── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid #1a2030' }}>
           <div
             ref={chatRef}
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-            }}
+            style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}
           >
+            {messages.length === 0 && (
+              <div style={{ opacity: 0.3, fontSize: 12, marginTop: 8 }}>No messages yet...</div>
+            )}
             {messages.map((msg) => (
-              <div key={msg.key} style={{ fontSize: 13, lineHeight: 1.5 }}>
-                <span style={{ color: msg.author === 'You' ? '#4488ff' : msg.author === '📋 DETECTIVE' ? '#ffcc00' : '#88aacc', fontWeight: 'bold' }}>
+              <div key={msg.key} style={{ fontSize: 13, lineHeight: 1.6 }}>
+                <span style={{
+                  color: msg.author === 'You' ? '#4488ff'
+                    : msg.author === '📋 DETECTIVE' ? '#ffcc00' : '#88aacc',
+                  fontWeight: 'bold',
+                }}>
                   {msg.author}:
                 </span>{' '}
                 <span style={{ opacity: 0.85 }}>{msg.text}</span>
@@ -199,141 +196,125 @@ export default function Discussion({ gsm, players, playerRole, onVotingDone }: P
             ))}
           </div>
 
-          {/* Chat input */}
           {phase === 'CHAT' && (
-            <form onSubmit={sendChat} style={{ display: 'flex', borderTop: '1px solid #223', padding: 8, gap: 8 }}>
+            <form onSubmit={sendChat} style={{ display: 'flex', borderTop: '1px solid #1a2030', padding: 8, gap: 8 }}>
               <input
+                autoFocus
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Say something..."
                 style={{
-                  flex: 1,
-                  background: '#0a0f1e',
-                  border: '1px solid #334',
-                  borderRadius: 4,
-                  color: '#fff',
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                  padding: '6px 10px',
-                  outline: 'none',
+                  flex: 1, background: '#0a0f1e', border: '1px solid #334',
+                  borderRadius: 4, color: '#fff', fontFamily: 'monospace',
+                  fontSize: 13, padding: '7px 10px', outline: 'none',
                 }}
               />
               <button
                 type="submit"
                 style={{
-                  background: '#1a2840',
-                  border: '1px solid #4488ff',
-                  borderRadius: 4,
-                  color: '#4488ff',
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  padding: '6px 14px',
-                  cursor: 'pointer',
+                  background: '#1a2840', border: '1px solid #4488ff', borderRadius: 4,
+                  color: '#4488ff', fontFamily: 'monospace', fontSize: 12,
+                  padding: '7px 14px', cursor: 'pointer',
                 }}
               >
                 Send
               </button>
             </form>
           )}
+
+          {phase === 'VOTING' && (
+            <div style={{ padding: '10px 16px', borderTop: '1px solid #1a2030', fontSize: 12, color: '#556', fontStyle: 'italic' }}>
+              Voting in progress — select a player on the right to eject.
+            </div>
+          )}
         </div>
 
-        {/* Right: player list + vote/accuse */}
-        <div style={{ width: 260, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: 11, letterSpacing: 2, opacity: 0.5, marginBottom: 4 }}>
-            {phase === 'VOTING' ? 'VOTE TO EJECT' : 'PLAYERS'}
+        {/* ── Right: player vote list ──────────────────────────────────────── */}
+        <div style={{ width: 280, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: phase === 'VOTING' ? '#ff4444' : '#556', marginBottom: 6, textAlign: 'center' }}>
+            {phase === 'VOTING' ? '— CLICK TO VOTE —' : 'PLAYERS'}
           </div>
 
           {alivePlayers.map((p) => {
             const isMe = p.isHuman
-            const myVoteTarget = votes['human'] === p.id
+            const myVoteTarget = playerVote === p.id
             const totalVotes = Object.values(votes).filter((v) => v === p.id).length
             const revealedThisPlayer = revealedRole?.name === p.name
+            const canVoteThis = phase === 'VOTING' && !isMe && !playerVote
 
             return (
               <div
                 key={p.id}
+                onClick={() => canVoteThis && castVote(p.id)}
                 style={{
-                  background: myVoteTarget ? 'rgba(255,68,68,0.15)' : 'rgba(255,255,255,0.04)',
-                  border: myVoteTarget ? '1px solid #ff4444' : '1px solid #223',
-                  borderRadius: 6,
-                  padding: '8px 12px',
+                  background: myVoteTarget
+                    ? 'rgba(255,68,68,0.2)'
+                    : canVoteThis
+                    ? 'rgba(255,255,255,0.05)'
+                    : 'rgba(255,255,255,0.03)',
+                  border: myVoteTarget
+                    ? '2px solid #ff4444'
+                    : canVoteThis
+                    ? '1px solid #334'
+                    : '1px solid #1a2030',
+                  borderRadius: 8,
+                  padding: canVoteThis ? '12px 14px' : '8px 12px',
+                  cursor: canVoteThis ? 'pointer' : 'default',
+                  transition: 'background 0.15s, border 0.15s, padding 0.15s',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: isMe ? '#4488ff' : '#cdd', fontWeight: isMe ? 'bold' : 'normal', fontSize: 13 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{
+                    fontSize: canVoteThis ? 16 : 13,
+                    fontWeight: canVoteThis || isMe ? 'bold' : 'normal',
+                    color: isMe ? '#4488ff' : myVoteTarget ? '#ff8888' : '#cde',
+                    transition: 'font-size 0.15s',
+                  }}>
                     {isMe ? '▶ ' : ''}{p.name}
                   </span>
-                  {totalVotes > 0 && (
-                    <span style={{ fontSize: 11, color: '#ff8888', fontWeight: 'bold' }}>
-                      {totalVotes} vote{totalVotes > 1 ? 's' : ''}
-                    </span>
+                  {revealedThisPlayer && (
+                    <span style={{ fontSize: 10, color: '#ffcc00', letterSpacing: 1 }}>ROLE: {p.role}</span>
+                  )}
+                  {phase === 'CHAT' && detectiveCanReveal && !isMe && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); useDetectiveReveal(p.id) }}
+                      style={{
+                        background: 'rgba(255,204,0,0.15)', border: '1px solid #ffcc00',
+                        borderRadius: 4, color: '#ffcc00', fontFamily: 'monospace',
+                        fontSize: 10, padding: '2px 7px', cursor: 'pointer', marginTop: 2, width: 'fit-content',
+                      }}
+                    >
+                      🔍 Reveal
+                    </button>
                   )}
                 </div>
 
-                {revealedThisPlayer && (
-                  <div style={{ fontSize: 10, color: '#ffcc00', letterSpacing: 1 }}>
-                    ROLE: {p.role}
-                  </div>
-                )}
-
-                {phase === 'VOTING' && !isMe && !playerVote && (
-                  <button
-                    onClick={() => castVote(p.id)}
-                    style={{
-                      background: 'rgba(255,68,68,0.2)',
-                      border: '1px solid #ff4444',
-                      borderRadius: 4,
-                      color: '#ff8888',
-                      fontFamily: 'monospace',
-                      fontSize: 11,
-                      padding: '3px 8px',
-                      cursor: 'pointer',
-                      marginTop: 2,
-                    }}
-                  >
-                    Vote Eject
-                  </button>
-                )}
-
-                {phase === 'CHAT' && detectiveCanReveal && !isMe && (
-                  <button
-                    onClick={() => useDetectiveReveal(p.id)}
-                    style={{
-                      background: 'rgba(255,204,0,0.15)',
-                      border: '1px solid #ffcc00',
-                      borderRadius: 4,
-                      color: '#ffcc00',
-                      fontFamily: 'monospace',
-                      fontSize: 10,
-                      padding: '3px 8px',
-                      cursor: 'pointer',
-                      marginTop: 2,
-                    }}
-                  >
-                    🔍 Reveal Role
-                  </button>
-                )}
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  {totalVotes > 0 && (
+                    <span style={{ fontSize: 13, color: '#ff6666', fontWeight: 'bold' }}>
+                      {totalVotes}🗳
+                    </span>
+                  )}
+                  {canVoteThis && (
+                    <div style={{ fontSize: 10, color: '#556', marginTop: 2 }}>tap to vote</div>
+                  )}
+                </div>
               </div>
             )
           })}
 
+          {/* Skip button */}
           {phase === 'VOTING' && !playerVote && (
             <button
               onClick={skipVote}
               style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid #334',
-                borderRadius: 4,
-                color: '#667788',
-                fontFamily: 'monospace',
-                fontSize: 12,
-                padding: '6px 12px',
-                cursor: 'pointer',
-                marginTop: 8,
-                width: '100%',
+                background: 'transparent', border: '1px dashed #334',
+                borderRadius: 6, color: '#445', fontFamily: 'monospace',
+                fontSize: 12, padding: '10px', cursor: 'pointer', marginTop: 4,
               }}
             >
               Skip Vote
@@ -341,8 +322,8 @@ export default function Discussion({ gsm, players, playerRole, onVotingDone }: P
           )}
 
           {phase === 'VOTING' && playerVote && (
-            <div style={{ fontSize: 12, color: '#88aacc', marginTop: 8, textAlign: 'center', opacity: 0.7 }}>
-              {playerVote === 'SKIP' ? 'Skipped.' : 'Vote cast. Waiting...'}
+            <div style={{ fontSize: 13, color: '#88aacc', marginTop: 10, textAlign: 'center', opacity: 0.8 }}>
+              {playerVote === 'SKIP' ? '— Skipped —' : '✓ Vote cast'}
             </div>
           )}
         </div>

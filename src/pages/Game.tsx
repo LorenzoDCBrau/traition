@@ -51,6 +51,7 @@ export default function Game() {
   const [nearEnemy, setNearEnemy] = useState(false)
   const [showHackTerminal, setShowHackTerminal] = useState(false)
   const [ejectedId, setEjectedId] = useState<string | null>(null)
+  const [showInstructions, setShowInstructions] = useState(false)
 
   const syncUI = useCallback((gsm: GameStateManager) => {
     setUI({
@@ -100,6 +101,11 @@ export default function Game() {
   }, [])
 
   function handleRoleRevealDone() {
+    setShowInstructions(true)
+  }
+
+  function handleInstructionsDone() {
+    setShowInstructions(false)
     gsmRef.current?.startPlaying()
   }
 
@@ -158,6 +164,64 @@ export default function Game() {
       {/* Role reveal overlay */}
       {ui.phase === 'ROLE_REVEAL' && gsm && (
         <RoleReveal role={ui.playerRole} onDone={handleRoleRevealDone} />
+      )}
+
+      {/* How to Play overlay (shown once after role reveal) */}
+      {showInstructions && (
+        <div
+          style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(4,8,18,0.96)', zIndex: 250,
+            fontFamily: 'monospace', color: '#fff',
+          }}
+        >
+          <div
+            style={{
+              background: '#080f1e',
+              border: '2px solid #2a4060',
+              borderRadius: 16,
+              padding: '44px 56px',
+              maxWidth: 460,
+              textAlign: 'center',
+              boxShadow: '0 0 60px #0033aa44',
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 'bold', letterSpacing: 6, marginBottom: 32, color: '#aaccff' }}>
+              HOW TO PLAY
+            </div>
+            <div style={{ textAlign: 'left', lineHeight: 2.2, fontSize: 14, color: '#cde' }}>
+              <div><span style={{ color: '#4488ff', fontWeight: 'bold' }}>WASD</span> — Move</div>
+              <div><span style={{ color: '#4488ff', fontWeight: 'bold' }}>E</span> — Interact with terminals</div>
+              <div><span style={{ color: '#4488ff', fontWeight: 'bold' }}>F</span> — Report dead body</div>
+              <div style={{ marginTop: 16, borderTop: '1px solid #1a2a3a', paddingTop: 16, color: '#88aacc', fontSize: 13, lineHeight: 1.8 }}>
+                Complete <b style={{ color: '#fff' }}>5 missions</b> to win as Innocent.
+                <br />
+                Find and eject the <b style={{ color: '#ff4444' }}>Traitor</b> during discussions.
+                <br />
+                Report bodies to trigger a vote.
+              </div>
+            </div>
+            <button
+              onClick={handleInstructionsDone}
+              style={{
+                marginTop: 32,
+                background: '#1a3a60',
+                border: '2px solid #4488ff',
+                borderRadius: 8,
+                color: '#aaccff',
+                fontFamily: 'monospace',
+                fontSize: 16,
+                fontWeight: 'bold',
+                padding: '12px 48px',
+                cursor: 'pointer',
+                letterSpacing: 4,
+              }}
+            >
+              GOT IT
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Hack Terminal minigame */}

@@ -15,12 +15,19 @@ export default function HackTerminalUI({ terminal, onClose }: Props) {
 
     const onKey = (e: KeyboardEvent) => {
       if (closedRef.current) return
+      e.preventDefault()
       if (e.key === 'Escape') { closedRef.current = true; onClose(false); return }
-      terminal.handleKey(e.key)
+
+      // Only accept letter input while ACTIVE; ignore keys during SHOWING / after result
+      if (terminal.status === 'ACTIVE') {
+        terminal.handleKey(e.key.toUpperCase())
+      }
       forceUpdate((n) => n + 1)
-      if (terminal.status === 'SUCCESS' || terminal.status === 'FAIL') {
+      // Re-read status after handleKey may have mutated it
+      const st = terminal.status
+      if (st === 'SUCCESS' || st === 'FAIL') {
         setTimeout(() => {
-          if (!closedRef.current) { closedRef.current = true; onClose(terminal.status === 'SUCCESS') }
+          if (!closedRef.current) { closedRef.current = true; onClose(st === 'SUCCESS') }
         }, 900)
       }
     }
