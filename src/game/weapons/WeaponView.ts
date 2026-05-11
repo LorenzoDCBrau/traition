@@ -49,6 +49,18 @@ export class WeaponView {
       new GLTFLoader(manager).load(url, res as never, undefined, rej),
     )
     console.log(`[WeaponView] ✓ ${url}`)
+    gltf.scene.traverse((n) => {
+      if (n instanceof THREE.Mesh) {
+        const oldMat = n.material as THREE.MeshStandardMaterial
+        n.material = new THREE.MeshBasicMaterial({
+          map: oldMat.map,
+          transparent: oldMat.transparent,
+          alphaTest: oldMat.alphaTest,
+          side: THREE.DoubleSide,
+        })
+        n.material.needsUpdate = true
+      }
+    })
     return new WeaponView(gltf.scene)
   }
 

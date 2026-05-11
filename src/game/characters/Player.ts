@@ -68,11 +68,14 @@ export class Player {
       const model = gltf.scene
       model.traverse((n) => {
         if (n instanceof THREE.Mesh) {
-          n.material = new THREE.MeshStandardMaterial({
+          const oldMat = n.material as THREE.MeshStandardMaterial
+          n.material = new THREE.MeshBasicMaterial({
             map: texture,
-            roughness: 0.7,
-            metalness: 0.0,
+            transparent: oldMat.transparent,
+            alphaTest: oldMat.alphaTest,
+            side: THREE.DoubleSide,
           })
+          n.material.needsUpdate = true
         }
       })
       console.log(`[Player] ✓ ${glbUrl}`)
