@@ -86,6 +86,14 @@ export async function spawnNPCs(scene: THREE.Scene, roles: Role[]): Promise<NPC[
 
       model.traverse((n) => {
         if (n instanceof THREE.Mesh) {
+          console.log('[DIAG] Material type:', (n.material as THREE.MeshStandardMaterial).type)
+          console.log('[DIAG] Has map:', !!(n.material as THREE.MeshStandardMaterial).map)
+          console.log('[DIAG] Map src:', (n.material as THREE.MeshStandardMaterial).map?.source?.data?.src || 'no src')
+          const mat = Array.isArray(n.material) ? n.material[0] : n.material
+          console.log(`[NPC-DIAG character-${id}] Material type:`, mat.type)
+          console.log(`[NPC-DIAG character-${id}] Has map:`, !!(mat as THREE.MeshStandardMaterial).map)
+          console.log(`[NPC-DIAG character-${id}] Map image:`, (mat as THREE.MeshStandardMaterial).map?.image?.src ?? (mat as THREE.MeshStandardMaterial).map?.image)
+
           const oldMat = n.material as THREE.MeshStandardMaterial
           n.material = new THREE.MeshBasicMaterial({
             map: texture,
