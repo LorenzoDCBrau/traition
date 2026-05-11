@@ -1,13 +1,14 @@
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 const SEQ_LENGTH = 5
-const TIME_LIMIT = 10
+const SHOW_TIME = 3    // seconds to display sequence before accepting input
+const TIME_LIMIT = 15  // seconds to type once ACTIVE
 
-export type HackStatus = 'IDLE' | 'ACTIVE' | 'SUCCESS' | 'FAIL'
+export type HackStatus = 'IDLE' | 'SHOWING' | 'ACTIVE' | 'SUCCESS' | 'FAIL'
 
 export class HackTerminal {
   sequence = ''
   input = ''
-  timeLeft = TIME_LIMIT
+  timeLeft = SHOW_TIME
   status: HackStatus = 'IDLE'
 
   start() {
@@ -16,31 +17,33 @@ export class HackTerminal {
       () => LETTERS[Math.floor(Math.random() * LETTERS.length)],
     ).join('')
     this.input = ''
-    this.timeLeft = TIME_LIMIT
-    this.status = 'ACTIVE'
+    this.timeLeft = SHOW_TIME
+    this.status = 'SHOWING'
   }
 
   handleKey(key: string): boolean {
     if (this.status !== 'ACTIVE') return false
     if (key.length !== 1) return false
-
     const ch = key.toUpperCase()
     if (!LETTERS.includes(ch)) return false
 
     this.input += ch
-
     if (this.input.length === SEQ_LENGTH) {
-      if (this.input === this.sequence) {
-        this.status = 'SUCCESS'
-      } else {
-        this.status = 'FAIL'
-      }
+      this.status = this.input === this.sequence ? 'SUCCESS' : 'FAIL'
       return true
     }
     return false
   }
 
   update(dt: number): boolean {
+    if (this.status === 'SHOWING') {
+      this.timeLeft -= dt
+      if (this.timeLeft <= 0) {
+        this.timeLeft = TIME_LIMIT
+        this.status = 'ACTIVE'
+      }
+      return false
+    }
     if (this.status !== 'ACTIVE') return false
     this.timeLeft -= dt
     if (this.timeLeft <= 0) {
@@ -55,6 +58,6 @@ export class HackTerminal {
     this.status = 'IDLE'
     this.sequence = ''
     this.input = ''
-    this.timeLeft = TIME_LIMIT
+    this.timeLeft = SHOW_TIME
   }
 }

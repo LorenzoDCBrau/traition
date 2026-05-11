@@ -118,6 +118,11 @@ export default function Discussion({ gsm, players, playerRole, onVotingDone }: P
     setVotes((v) => ({ ...v, human: targetId }))
   }
 
+  function skipVote() {
+    if (playerVote) return
+    setPlayerVote('SKIP')
+  }
+
   function useDetectiveReveal(targetId: string) {
     const result = gsm.revealRole(targetId)
     if (result) {
@@ -315,9 +320,29 @@ export default function Discussion({ gsm, players, playerRole, onVotingDone }: P
             )
           })}
 
+          {phase === 'VOTING' && !playerVote && (
+            <button
+              onClick={skipVote}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid #334',
+                borderRadius: 4,
+                color: '#667788',
+                fontFamily: 'monospace',
+                fontSize: 12,
+                padding: '6px 12px',
+                cursor: 'pointer',
+                marginTop: 8,
+                width: '100%',
+              }}
+            >
+              Skip Vote
+            </button>
+          )}
+
           {phase === 'VOTING' && playerVote && (
             <div style={{ fontSize: 12, color: '#88aacc', marginTop: 8, textAlign: 'center', opacity: 0.7 }}>
-              Vote cast. Waiting...
+              {playerVote === 'SKIP' ? 'Skipped.' : 'Vote cast. Waiting...'}
             </div>
           )}
         </div>

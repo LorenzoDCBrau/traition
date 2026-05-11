@@ -22,18 +22,14 @@ const ROLE_INFO: Record<Role, { color: string; desc: string }> = {
 }
 
 export default function RoleReveal({ role, onDone }: Props) {
-  const [countdown, setCountdown] = useState(4)
+  const [countdown, setCountdown] = useState(3)
   const info = ROLE_INFO[role]
 
   useEffect(() => {
-    const iv = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) { clearInterval(iv); onDone(); return 0 }
-        return c - 1
-      })
-    }, 1000)
-    return () => clearInterval(iv)
-  }, [onDone])
+    const timer = setTimeout(() => { onDone() }, 3000)
+    const iv = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000)
+    return () => { clearTimeout(timer); clearInterval(iv) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
