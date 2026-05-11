@@ -40,8 +40,13 @@ export class WeaponView {
 
   static async load(): Promise<WeaponView> {
     const url = '/assets/weapons/blaster-a.glb'
+    const manager = new THREE.LoadingManager()
+    manager.setURLModifier((u) => {
+      if (u.includes('Textures/colormap')) return '/assets/furniture/colormap.png'
+      return u
+    })
     const gltf = await new Promise<{ scene: THREE.Group }>((res, rej) =>
-      new GLTFLoader().load(url, res as never, undefined, rej),
+      new GLTFLoader(manager).load(url, res as never, undefined, rej),
     )
     console.log(`[WeaponView] ✓ ${url}`)
     return new WeaponView(gltf.scene)

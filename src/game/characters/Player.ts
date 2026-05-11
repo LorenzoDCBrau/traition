@@ -62,7 +62,9 @@ export class Player {
           new THREE.TextureLoader().load(texUrl, res, undefined, rej),
         ),
       ])
+      texture.flipY = false
       texture.colorSpace = THREE.SRGBColorSpace
+      texture.needsUpdate = true
       const model = gltf.scene
       model.traverse((n) => {
         if (n instanceof THREE.Mesh) {
