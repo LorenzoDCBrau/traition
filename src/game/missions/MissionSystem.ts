@@ -64,46 +64,8 @@ export class MissionSystem {
     }
   }
 
-  private _makeMarker(type: MissionType): THREE.Object3D {
-    const color = this._missionColor(type)
-    const group = new THREE.Group()
-
-    // Glowing ring on floor
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.6, 0.9, 32),
-      new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 1.5,
-        side: THREE.DoubleSide,
-      }),
-    )
-    ring.rotation.x = -Math.PI / 2
-    ring.position.y = 0.02
-    group.add(ring)
-
-    // Floating icon pillar (thin cylinder)
-    const pillar = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8),
-      new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 1.0,
-      }),
-    )
-    pillar.position.y = 0.75
-    group.add(pillar)
-
-    return group
-  }
-
-  private _missionColor(type: MissionType): number {
-    switch (type) {
-      case 'HACK_TERMINAL':  return 0x00ffcc
-      case 'FIX_GENERATOR':  return 0xffaa00
-      case 'REPAIR_PANEL':   return 0xff4488
-      case 'UPLOAD_DATA':    return 0x4488ff
-      case 'SCAN_ID':        return 0xaaff44
-    }
+  private _makeMarker(_type: MissionType): THREE.Object3D {
+    // Visual markers removed — placeholder geometry will be replaced with proper UI
+    return new THREE.Group()
   }
 }

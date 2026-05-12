@@ -12,34 +12,36 @@ const NPC_IDS = ['b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q'
 
 export let DEBUG_NPCS_LOADED = 0
 
-const MAX_BOUND = 11
-
-// [wx, wz, rotY] — spread across all rooms
+// [wx, wz, rotY] — 6 center + 3 north + 3 south + 3 east + 2 west = 17
+// Room world bounds (tw(t) = t*2-7):
+//   Center:  x∈[-7,7],  z∈[-7,7]
+//   North:   x∈[-3,3],  z∈[-19,-13]
+//   South:   x∈[-3,3],  z∈[13,19]
+//   West:    x∈[-19,-13], z∈[-3,3]
+//   East:    x∈[13,19],   z∈[-3,3]
 const NPC_PLACEMENTS: [number, number, number][] = [
-  // Main room
+  // Center room (6)
   [-3, -3,  0],
-  [-1, -2,  Math.PI / 4],
-  [ 1, -3,  Math.PI],
-  [ 3, -2, -Math.PI / 4],
-  [-2,  0,  Math.PI / 2],
-  [ 2,  0, -Math.PI / 2],
-  [-3,  2,  Math.PI / 3],
-  [ 0,  3, -Math.PI / 6],
-  [ 3,  2,  Math.PI],
-  // North room
-  [-1, -9,  Math.PI],
-  [ 1, -9,  Math.PI],
-  [ 0, -11, Math.PI],
-  // South room
-  [-1,  9,  0],
-  [ 1,  9,  0],
-  [ 0,  11, 0],
-  // East room
-  [ 9, -1,  Math.PI / 2],
-  [ 9,  1,  Math.PI / 2],
-  // West room
-  [-9, -1, -Math.PI / 2],
-  [-9,  1, -Math.PI / 2],
+  [ 3, -3,  Math.PI],
+  [-3,  3,  Math.PI],
+  [ 3,  3,  0],
+  [ 0, -2,  Math.PI],
+  [ 0,  2,  0],
+  // North room (3)
+  [-1, -15, Math.PI],
+  [ 1, -15, Math.PI],
+  [ 0, -17, 0],
+  // South room (3)
+  [-1,  15, 0],
+  [ 1,  15, 0],
+  [ 0,  17, Math.PI],
+  // East room (3)
+  [ 15, -1, -Math.PI / 2],
+  [ 15,  1, -Math.PI / 2],
+  [ 17,  0, -Math.PI / 2],
+  // West room (2)
+  [-15, -1,  Math.PI / 2],
+  [-15,  1,  Math.PI / 2],
 ]
 
 const _loadedIds = new Set<string>()
@@ -83,22 +85,19 @@ export async function spawnNPCs(scene: THREE.Scene, roles: Role[]): Promise<NPC[
 
       // Uniform scale normalised to TARGET_HEIGHT
       model.updateMatrixWorld(true)
-      const b = new THREE.Box3().setFromObject(model)
-      const h = b.max.y - b.min.y
-      if (h > 0.001) model.scale.setScalar(TARGET_HEIGHT / h)
+      const box = new THREE.Box3().setFromObject(model)
+      const height = box.max.y - box.min.y
+      const scale = height > 0.001 ? TARGET_HEIGHT / height : 1
+      model.scale.set(scale, scale, scale)
       model.updateMatrixWorld(true)
 
       const b2 = new THREE.Box3().setFromObject(model)
       const startY = FLOOR_LEVEL - b2.min.y
 
-      // Clamp spawn within walkable bounds
-      const clampedX = Math.max(-MAX_BOUND, Math.min(MAX_BOUND, wx))
-      const clampedZ = Math.max(-MAX_BOUND, Math.min(MAX_BOUND, wz))
-
-      model.position.set(clampedX, startY, clampedZ)
+      model.position.set(wx, startY, wz)
       model.rotation.y = rotY
 
-      const startPos = new THREE.Vector3(clampedX, startY, clampedZ)
+      const startPos = new THREE.Vector3(wx, startY, wz)
       scene.add(model)
 
       const npc = new NPC(`npc-${i}`, name, role, model, startPos, scene)

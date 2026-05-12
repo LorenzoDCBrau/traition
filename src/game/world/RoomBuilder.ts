@@ -84,6 +84,14 @@ function bottomOffset(obj: THREE.Group): number {
   return -box3(obj).min.y
 }
 
+/** Override all mesh materials on a template with a solid colour. */
+function paintModel(tpl: THREE.Group, color: number) {
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0.1 })
+  tpl.traverse((n) => {
+    if (n instanceof THREE.Mesh) n.material = mat
+  })
+}
+
 function makeFallback(w: number, h: number, d: number, color: number): THREE.Group {
   const g = new THREE.Group()
   const m = new THREE.Mesh(
@@ -201,17 +209,16 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
     tpl.updateMatrixWorld(true)
   }
 
-  const floorY  = bottomOffset(floorTpl)
-  const wallY   = bottomOffset(wallTpl)
-  bottomOffset(cornerTpl)  // measure only, use wallY for placement
-  bottomOffset(doorTpl)    // measure only, use wallY for placement
+  // Apply sci-fi dark colours — replaces colormap texture with solid materials
+  paintModel(floorTpl,  0x1a1f2e)
+  paintModel(wallTpl,   0x2a3050)
+  paintModel(cornerTpl, 0x2a3050)
+  paintModel(doorTpl,   0x2a3050)
 
-  // Compute wall top height for ceiling placement
-  wallTpl.position.set(0, wallY, 0)
-  wallTpl.updateMatrixWorld(true)
-  const WALL_TOP = box3(wallTpl).max.y
-  wallTpl.position.set(0, 0, 0)
-  wallTpl.updateMatrixWorld(true)
+  const floorY = bottomOffset(floorTpl)
+  const wallY  = bottomOffset(wallTpl)
+  bottomOffset(cornerTpl)
+  bottomOffset(doorTpl)
 
   // ── Furniture templates ──────────────────────────────────────────────────
   const compTpl  = computerM ?? makeFallback(0.7, 1.2, 0.5, 0x334466)
@@ -271,19 +278,6 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
     } else if (entry.type === 'corner') {
       placeClone(cornerTpl, scene, wx, wallY, wz, entry.rotY)
     }
-  }
-
-  // ── Ceiling — inverted floor tile at wall height for all floor tiles ────
-  for (const [key, entry] of tileMap) {
-    if (entry.type !== 'floor') continue
-    const [txs, tzs] = key.split(',')
-    const wx = +txs * TILE + WORLD_OFFSET
-    const wz = +tzs * TILE + WORLD_OFFSET
-    const ceil = floorTpl.clone(true)
-    ceil.position.set(wx, WALL_TOP, wz)
-    ceil.rotation.x = Math.PI
-    enableShadows(ceil)
-    scene.add(ceil)
   }
 
   // ── Furniture — main room ────────────────────────────────────────────────

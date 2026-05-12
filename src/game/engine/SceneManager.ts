@@ -1,15 +1,10 @@
 import * as THREE from 'three'
-import type { WeaponView } from '../weapons/WeaponView'
 
-// True isometric offset: equal on all three axes
-const ISO = new THREE.Vector3(20, 20, 20)
+// Isometric camera offset — lower Y gives a shallower angle showing characters better
+const ISO = new THREE.Vector3(18, 16, 18)
 
 // Orthographic frustum height — controls zoom. 24 units ≈ 8 tiles visible vertically.
 const FRUSTUM_H = 24
-
-const WP_W = 120
-const WP_H = 120
-const WP_MARGIN = 20
 
 export class SceneManager {
   scene: THREE.Scene
@@ -37,7 +32,7 @@ export class SceneManager {
       400,
     )
     this.camera.position.copy(ISO)
-    this.camera.lookAt(0, 0, 0)
+    this.camera.lookAt(0, 1, 0)
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -98,29 +93,12 @@ export class SceneManager {
     this._playerLight.position.set(pos.x, pos.y + 3, pos.z)
   }
 
-  render(weaponView?: WeaponView) {
+  render() {
     const canvas = this.renderer.domElement
     const W = canvas.clientWidth || window.innerWidth
     const H = canvas.clientHeight || window.innerHeight
-
-    // Main isometric view
-    this.renderer.autoClear = true
-    this.renderer.setScissorTest(false)
     this.renderer.setViewport(0, 0, W, H)
     this.renderer.render(this.scene, this.camera)
-
-    // Weapon viewport — bottom-right corner, drawn on top
-    if (weaponView) {
-      this.renderer.autoClear = false
-      this.renderer.setScissorTest(true)
-      this.renderer.setScissor(W - WP_W - WP_MARGIN, WP_MARGIN, WP_W, WP_H)
-      this.renderer.setViewport(W - WP_W - WP_MARGIN, WP_MARGIN, WP_W, WP_H)
-      this.renderer.clearColor()
-      this.renderer.clearDepth()
-      this.renderer.render(weaponView.scene, weaponView.camera)
-      this.renderer.setScissorTest(false)
-      this.renderer.autoClear = true
-    }
   }
 
   private _onResize = () => {

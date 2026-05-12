@@ -5,7 +5,6 @@ import { GameLoop } from '../game/engine/GameLoop'
 import { buildSpaceStationRoom } from '../game/world/RoomBuilder'
 import { Player } from '../game/characters/Player'
 import { spawnNPCs } from '../game/characters/NPCManager'
-import { WeaponView } from '../game/weapons/WeaponView'
 import { GameStateManager } from '../game/state/GameState'
 import { MissionSystem } from '../game/missions/MissionSystem'
 import { BodyManager } from '../game/bodies/BodyManager'
@@ -87,9 +86,6 @@ export default function GameCanvas({ onReady }: Props) {
           npc.name = p.name
         }
       })
-
-      setLoadStatus('Loading weapon...')
-      const weaponView = await WeaponView.load()
 
       setLoadStatus('Initialising systems...')
       missionSys.init(sceneManager.scene, gsm.missions)
@@ -189,12 +185,11 @@ export default function GameCanvas({ onReady }: Props) {
       loop = new GameLoop((dt) => {
         if (gsm.phase !== 'PLAYING' && gsm.phase !== 'ROLE_REVEAL') {
           // Still render but don't update game logic
-          sceneManager.render(weaponView)
+          sceneManager.render()
           return
         }
 
         if (player) player.update(dt)
-        weaponView.update(dt)
 
         if (player && gsm.phase === 'PLAYING') {
           // Update NPC AI
@@ -229,7 +224,7 @@ export default function GameCanvas({ onReady }: Props) {
         }
 
         if (player) sceneManager.followPlayer(player.position)
-        sceneManager.render(weaponView)
+        sceneManager.render()
       })
       loop.start()
     }

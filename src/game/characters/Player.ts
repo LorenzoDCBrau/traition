@@ -32,9 +32,10 @@ export class Player {
 
   private constructor(scene: THREE.Scene, model: THREE.Group) {
     model.updateMatrixWorld(true)
-    const b = new THREE.Box3().setFromObject(model)
-    const h = b.max.y - b.min.y
-    if (h > 0.001) model.scale.setScalar(TARGET_HEIGHT / h)
+    const box = new THREE.Box3().setFromObject(model)
+    const height = box.max.y - box.min.y
+    const scale = height > 0.001 ? TARGET_HEIGHT / height : 1
+    model.scale.set(scale, scale, scale)
     model.updateMatrixWorld(true)
 
     const b2 = new THREE.Box3().setFromObject(model)
