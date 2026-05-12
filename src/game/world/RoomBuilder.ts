@@ -17,7 +17,7 @@ async function loadOBJ(name: string): Promise<THREE.Group | null> {
   return new Promise((resolve) => {
     const mtl = new MTLLoader()
     mtl.setPath(STATION)
-    mtl.setResourcePath(`${STATION}Textures/`)
+    mtl.setResourcePath(STATION)
     console.log(`[RoomBuilder] Loading MTL: ${STATION}${name}.mtl`)
     mtl.load(
       `${name}.mtl`,
