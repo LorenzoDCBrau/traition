@@ -62,14 +62,6 @@ function bottomOffset(obj: THREE.Group): number {
   return -box3(obj).min.y
 }
 
-/** Override all mesh materials on a template with a solid colour. */
-function paintModel(tpl: THREE.Group, color: number) {
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0.1 })
-  tpl.traverse((n) => {
-    if (n instanceof THREE.Mesh) n.material = mat
-  })
-}
-
 function makeFallback(w: number, h: number, d: number, color: number): THREE.Group {
   const g = new THREE.Group()
   const m = new THREE.Mesh(
