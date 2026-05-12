@@ -6,6 +6,8 @@ import type { Role } from '../roles/RoleSystem'
 
 const loader = new GLTFLoader()
 
+const TARGET_HEIGHT = 2.0
+
 const NPC_IDS = ['b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r']
 
 export let DEBUG_NPCS_LOADED = 0
@@ -79,8 +81,11 @@ export async function spawnNPCs(scene: THREE.Scene, roles: Role[]): Promise<NPC[
         }
       })
 
-      // Uniform scale — GLBs are pre-sized correctly
-      model.scale.setScalar(1.0)
+      // Uniform scale normalised to TARGET_HEIGHT
+      model.updateMatrixWorld(true)
+      const b = new THREE.Box3().setFromObject(model)
+      const h = b.max.y - b.min.y
+      if (h > 0.001) model.scale.setScalar(TARGET_HEIGHT / h)
       model.updateMatrixWorld(true)
 
       const b2 = new THREE.Box3().setFromObject(model)

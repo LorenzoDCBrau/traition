@@ -17,6 +17,7 @@ export class SceneManager {
   renderer: THREE.WebGLRenderer
 
   private _lookTarget = new THREE.Vector3()
+  private _playerLight = new THREE.PointLight(0xffffff, 1.5, 20)
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene()
@@ -67,6 +68,13 @@ export class SceneManager {
     this.scene.add(sun)
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.0))
+
+    const center = new THREE.PointLight(0xffffff, 2.0, 30)
+    center.position.set(0, 5, 0)
+    this.scene.add(center)
+
+    this._playerLight.position.set(0, 3, 0)
+    this.scene.add(this._playerLight)
   }
 
   /** Place room-atmosphere point lights at world positions */
@@ -87,6 +95,7 @@ export class SceneManager {
     this.camera.position.lerp(pos.clone().add(ISO), 0.08)
     this._lookTarget.lerp(pos, 0.08)
     this.camera.lookAt(this._lookTarget)
+    this._playerLight.position.set(pos.x, pos.y + 3, pos.z)
   }
 
   render(weaponView?: WeaponView) {
