@@ -35,13 +35,13 @@ const NPC_PLACEMENTS: [number, number, number][] = [
   [-1,  15, 0],
   [ 1,  15, 0],
   [ 0,  17, Math.PI],
-  // East room (3)
+  // East room (2)
   [ 15, -1, -Math.PI / 2],
   [ 15,  1, -Math.PI / 2],
-  [ 17,  0, -Math.PI / 2],
-  // West room (2)
+  // West room (3)
   [-15, -1,  Math.PI / 2],
   [-15,  1,  Math.PI / 2],
+  [-17,  0,  Math.PI / 2],
 ]
 
 const _loadedIds = new Set<string>()

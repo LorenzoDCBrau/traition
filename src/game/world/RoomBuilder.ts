@@ -5,58 +5,36 @@ import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js'
 const TILE = 2
 const WORLD_OFFSET = -7
 const STATION = '/assets/maps/station/'
+const COLORMAP_URL = `${STATION}Textures/colormap.png`
 
 export const LOADED_GLBS: string[] = []
 export let FLOOR_LEVEL = 0
 
 // ─── Loaders ──────────────────────────────────────────────────────────────────
 
-const COLORMAP_URL = `${STATION}Textures/colormap.png`
-
 async function loadOBJ(name: string): Promise<THREE.Group | null> {
   return new Promise((resolve) => {
     const mtl = new MTLLoader()
     mtl.setPath(STATION)
     mtl.setResourcePath(STATION)
-    console.log(`[RoomBuilder] Loading MTL: ${STATION}${name}.mtl`)
     mtl.load(
       `${name}.mtl`,
       (materials) => {
         materials.preload()
-        console.log(`[RoomBuilder] MTL OK: ${name}, materials:`, Object.keys(materials.materialsInfo))
         const obj = new OBJLoader()
         obj.setMaterials(materials)
         obj.load(
           `${STATION}${name}.obj`,
           (group) => {
-            console.log(`[RoomBuilder] OBJ OK: ${name}`)
-            // Force colormap texture on all meshes as fallback
-            const tex = new THREE.TextureLoader().load(COLORMAP_URL)
-            tex.colorSpace = THREE.SRGBColorSpace
-            group.traverse((node) => {
-              if (node instanceof THREE.Mesh) {
-                const mat = node.material as THREE.MeshStandardMaterial
-                if (!mat.map) {
-                  mat.map = tex
-                  mat.needsUpdate = true
-                }
-              }
-            })
             LOADED_GLBS.push(`${name}.obj`)
             resolve(group)
           },
           undefined,
-          (err) => {
-            console.error(`[RoomBuilder] ✗ OBJ: ${name}`, err)
-            resolve(null)
-          },
+          (err) => { console.error(`[RoomBuilder] ✗ OBJ: ${name}`, err); resolve(null) },
         )
       },
       undefined,
-      (err) => {
-        console.error(`[RoomBuilder] ✗ MTL: ${name}`, err)
-        resolve(null)
-      },
+      (err) => { console.error(`[RoomBuilder] ✗ MTL: ${name}`, err); resolve(null) },
     )
   })
 }
@@ -185,40 +163,50 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
   LOADED_GLBS.length = 0
   FLOOR_LEVEL = 0
 
-  // Load all station models in parallel (new loaders per call = no shared state)
-  const [floorM, wallM, cornerM, doorM, computerM, tableM, chairM] = await Promise.all([
+  // Load colormap texture and all station models concurrently
+  const colormapTex = await new Promise<THREE.Texture | null>((resolve) => {
+    new THREE.TextureLoader().load(
+      COLORMAP_URL,
+      (tex) => { tex.colorSpace = THREE.SRGBColorSpace; resolve(tex) },
+      undefined,
+      () => { console.warn('[RoomBuilder] colormap not found'); resolve(null) },
+    )
+  })
+
+  const [floorM, wallM, cornerM, computerM, tableM, chairM] = await Promise.all([
     loadOBJ('floor'),
     loadOBJ('wall'),
     loadOBJ('wall-corner'),
-    loadOBJ('wall-door'),
     loadOBJ('computer'),
     loadOBJ('table'),
     loadOBJ('chair'),
   ])
 
+  // Apply colormap to every OBJ mesh that was loaded
+  const colormapMat = new THREE.MeshStandardMaterial({
+    map: colormapTex ?? undefined,
+    roughness: 0.8,
+    metalness: 0.1,
+  })
+  for (const grp of [floorM, wallM, cornerM, computerM, tableM, chairM]) {
+    grp?.traverse((n) => { if (n instanceof THREE.Mesh) n.material = colormapMat })
+  }
+
   // ── Structural templates ─────────────────────────────────────────────────
   const floorTpl  = floorM  ?? makeFallback(TILE * 0.99, 0.12, TILE * 0.99, 0x1a2030)
   const wallTpl   = wallM   ?? makeFallback(TILE * 0.99, 2.5,  0.18,        0x2a3a50)
   const cornerTpl = cornerM ?? makeFallback(0.18, 2.5, 0.18, 0x334455)
-  const doorTpl   = doorM   ?? makeFallback(TILE * 0.99, 2.5, 0.18, 0x223344)
 
   // Compute unified scale from the floor tile (all station pieces share the same footprint)
   const sc = fitScaleFactor(floorTpl, TILE)
-  for (const tpl of [floorTpl, wallTpl, cornerTpl, doorTpl]) {
+  for (const tpl of [floorTpl, wallTpl, cornerTpl]) {
     tpl.scale.setScalar(sc)
     tpl.updateMatrixWorld(true)
   }
 
-  // Apply sci-fi dark colours — replaces colormap texture with solid materials
-  paintModel(floorTpl,  0x1a1f2e)
-  paintModel(wallTpl,   0x2a3050)
-  paintModel(cornerTpl, 0x2a3050)
-  paintModel(doorTpl,   0x2a3050)
-
   const floorY = bottomOffset(floorTpl)
   const wallY  = bottomOffset(wallTpl)
   bottomOffset(cornerTpl)
-  bottomOffset(doorTpl)
 
   // ── Furniture templates ──────────────────────────────────────────────────
   const compTpl  = computerM ?? makeFallback(0.7, 1.2, 0.5, 0x334466)
@@ -254,14 +242,6 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
   const tileMap = buildTileMap(walkable)
 
   // ── Place structural tiles ───────────────────────────────────────────────
-  //   Door tiles: north/south entrances of main room where corridor meets it
-  const doorKeys = new Set([
-    k(3, -1), k(4, -1),   // north corridor side closest to main room
-    k(3,  8), k(4,  8),   // south corridor side closest to main room
-    k(-1, 3), k(-1, 4),   // west corridor side closest to main room
-    k( 8, 3), k( 8, 4),   // east corridor side closest to main room
-  ])
-
   for (const [key, entry] of tileMap) {
     const [txs, tzs] = key.split(',')
     const wx = +txs * TILE + WORLD_OFFSET
@@ -270,11 +250,7 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
     if (entry.type === 'floor') {
       placeClone(floorTpl, scene, wx, floorY, wz, 0)
     } else if (entry.type === 'wall') {
-      if (doorKeys.has(key)) {
-        placeClone(doorTpl, scene, wx, wallY, wz, entry.rotY)
-      } else {
-        placeClone(wallTpl, scene, wx, wallY, wz, entry.rotY)
-      }
+      placeClone(wallTpl, scene, wx, wallY, wz, entry.rotY)
     } else if (entry.type === 'corner') {
       placeClone(cornerTpl, scene, wx, wallY, wz, entry.rotY)
     }
@@ -298,14 +274,18 @@ export async function buildSpaceStationRoom(scene: THREE.Scene): Promise<string[
   placeClone(compTpl, scene, tw(4), compY, tw(-4), 0)
   placeClone(tableTpl, scene, tw(3), tableY, tw(-5), 0)
 
-  // ── Furniture — south room: 2 chairs + 1 table ──────────────────────────
+  // ── Furniture — south room: 2 chairs + 2 tables + 1 computer ───────────
   placeClone(chairTpl, scene, tw(3), chairY, tw(11), Math.PI)
   placeClone(chairTpl, scene, tw(4), chairY, tw(11), Math.PI)
   placeClone(tableTpl, scene, tw(3), tableY, tw(12), Math.PI)
+  placeClone(tableTpl, scene, tw(4), tableY, tw(12), Math.PI)
+  placeClone(compTpl,  scene, tw(4), compY,  tw(10), Math.PI)
 
-  // ── Furniture — west room: 2 tables ─────────────────────────────────────
+  // ── Furniture — west room: 2 tables + 1 computer + 1 chair ──────────────
   placeClone(tableTpl, scene, tw(-4), tableY, tw(3), Math.PI / 2)
   placeClone(tableTpl, scene, tw(-4), tableY, tw(4), Math.PI / 2)
+  placeClone(compTpl,  scene, tw(-5), compY,  tw(3), -Math.PI / 2)
+  placeClone(chairTpl, scene, tw(-5), chairY, tw(4),  Math.PI / 2)
 
   // ── Furniture — east room: 1 computer + 2 chairs ────────────────────────
   placeClone(compTpl, scene, tw(11), compY, tw(3), -Math.PI / 2)

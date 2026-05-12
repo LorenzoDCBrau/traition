@@ -12,8 +12,8 @@ const ROOM = 48  // world units — covers all rooms (max extent ~±20)
 const SCALE = MAP_SIZE / ROOM
 
 function worldToMap(wx: number, wz: number): [number, number] {
-  const x = MAP_SIZE / 2 + wx * SCALE
-  const y = MAP_SIZE / 2 + wz * SCALE
+  const x = Math.max(4, Math.min(MAP_SIZE - 4, MAP_SIZE / 2 + wx * SCALE))
+  const y = Math.max(4, Math.min(MAP_SIZE - 4, MAP_SIZE / 2 + wz * SCALE))
   return [x, y]
 }
 

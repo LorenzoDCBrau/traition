@@ -4,7 +4,7 @@ import type { GameStateManager } from '../state/GameState'
 
 const SPEED_INNOCENT = 2.5
 const SPEED_TRAITOR  = 3.2
-const BOUNDARY = 20
+const BOUNDARY = 18
 const ARRIVE_DIST = 0.6
 const KILL_DIST   = 1.8
 const HUNT_DIST   = 6.0   // Traitor follows player within this range
